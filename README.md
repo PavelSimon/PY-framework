@@ -1,6 +1,7 @@
 # PY-Framework
 
 A secure, robust FastHTML and DuckDB-based web framework with state-of-the-art authentication, minimal JavaScript, and built-in OAuth support for Google and GitHub.
+Created with full support fo Claude Code.
 
 ## 🚀 Features
 
@@ -187,6 +188,8 @@ The framework uses a modular route architecture for better maintainability and s
 - `POST /auth/login` - User login
 - `POST /auth/logout` - User logout
 - `GET /auth/verify/{token}` - Email verification
+- `GET /auth/resend-verification` - Resend verification email page
+- `POST /auth/resend-verification` - Resend verification email
 
 ### OAuth Endpoints
 - `GET /auth/google` - Google OAuth initiation

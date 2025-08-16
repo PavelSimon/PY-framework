@@ -107,11 +107,21 @@ def create_app_layout(
     user: Optional[Dict] = None,
     current_page: str = "",
     sidebar_items: List[Dict] = None,
-    show_sidebar: bool = True
+    show_sidebar: bool = True,
+    page_title: str = None,
+    page_subtitle: str = None
 ):
     """Create the main application layout with navbar and sidebar"""
     
     navbar = create_navbar(user, current_page)
+    
+    # Create page title section if provided
+    title_section = None
+    if page_title:
+        title_section = Div(
+            create_page_title(page_title, page_subtitle),
+            cls="page-title-section"
+        )
     
     if show_sidebar:
         sidebar = create_sidebar(sidebar_items, current_page)
@@ -126,26 +136,40 @@ def create_app_layout(
             cls="main-content"
         )
     
-    return Div(
-        navbar,
-        main_content,
-        cls="app-layout"
-    )
+    # Build layout with optional title section
+    layout_elements = [navbar]
+    if title_section:
+        layout_elements.append(title_section)
+    layout_elements.append(main_content)
+    
+    return Div(*layout_elements, cls="app-layout")
 
 
-def create_auth_layout(content, title: str = "PY-Framework"):
+def create_auth_layout(content, title: str = "PY-Framework", page_title: str = None, page_subtitle: str = None):
     """Create layout for authentication pages (no sidebar)"""
     
     navbar = create_navbar(user=None)
     
-    return Div(
-        navbar,
+    # Create page title section if provided
+    title_section = None
+    if page_title:
+        title_section = Div(
+            create_page_title(page_title, page_subtitle),
+            cls="page-title-section"
+        )
+    
+    # Build layout with optional title section
+    layout_elements = [navbar]
+    if title_section:
+        layout_elements.append(title_section)
+    layout_elements.append(
         Div(
             Div(content, cls="container"),
             cls="auth-content"
-        ),
-        cls="auth-layout"
+        )
     )
+    
+    return Div(*layout_elements, cls="auth-layout")
 
 
 def create_page_title(title: str, subtitle: str = None):

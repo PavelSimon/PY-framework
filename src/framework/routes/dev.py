@@ -8,7 +8,7 @@ from ..layout import create_app_layout, create_page_title
 from ..session import get_current_user
 
 
-def create_dev_routes(app, db=None, auth_service=None, email_service=None, settings=None):
+def create_dev_routes(app, db=None, auth_service=None, email_service=None, settings=None, csrf_protection=None):
     """Register development routes with the FastHTML app"""
     
     @app.get("/dev/test-email")
@@ -21,7 +21,6 @@ def create_dev_routes(app, db=None, auth_service=None, email_service=None, setti
             return RedirectResponse("/auth/login", status_code=302)
         
         content = Div(
-            create_page_title("Email Service Test", "Test the email functionality"),
             P("This development tool allows you to test the email service configuration."),
             Form(
                 Div(
@@ -42,7 +41,13 @@ def create_dev_routes(app, db=None, auth_service=None, email_service=None, setti
                 Li(f"TLS Enabled: {getattr(settings, 'smtp_use_tls', 'Not set')}"),
             )
         )
-        return Titled("Email Test", create_app_layout(content, user=user, current_page="/dev/test-email"))
+        return Titled("Email Test", create_app_layout(
+            content, 
+            user=user, 
+            current_page="/dev/test-email",
+            page_title="Email Service Test",
+            page_subtitle="Test the email functionality"
+        ))
     
     @app.post("/dev/test-email")
     def send_test_email(request, test_email: str):
@@ -70,12 +75,17 @@ def create_dev_routes(app, db=None, auth_service=None, email_service=None, setti
             message_class = "alert alert-warning"
         
         content = Div(
-            create_page_title("Email Test Result"),
             Div(message, cls=message_class),
             P(A("Back to Email Test", href="/dev/test-email", cls="btn btn-primary")),
             P(A("Dashboard", href="/dashboard", cls="btn btn-secondary"))
         )
-        return Titled("Email Test Result", create_app_layout(content, user=user, current_page="/dev/test-email"))
+        return Titled("Email Test Result", create_app_layout(
+            content, 
+            user=user, 
+            current_page="/dev/test-email",
+            page_title="Email Test Result",
+            page_subtitle="Test email sending result"
+        ))
     
     @app.get("/dev/test-auth")
     def test_auth(request):
@@ -86,7 +96,6 @@ def create_dev_routes(app, db=None, auth_service=None, email_service=None, setti
             return RedirectResponse("/auth/login", status_code=302)
         
         content = Div(
-            create_page_title("Authentication Test", "Test authentication system"),
             P("This development tool allows you to test the authentication system."),
             H3("Authentication Features:"),
             Ul(
@@ -104,7 +113,13 @@ def create_dev_routes(app, db=None, auth_service=None, email_service=None, setti
                 cls="button-group"
             )
         )
-        return Titled("Auth Test", create_app_layout(content, user=user, current_page="/dev/test-auth"))
+        return Titled("Auth Test", create_app_layout(
+            content, 
+            user=user, 
+            current_page="/dev/test-auth",
+            page_title="Authentication Test",
+            page_subtitle="Test authentication system"
+        ))
     
     @app.get("/dev/database")
     def test_database(request):
@@ -115,7 +130,6 @@ def create_dev_routes(app, db=None, auth_service=None, email_service=None, setti
             return RedirectResponse("/auth/login", status_code=302)
         
         content = Div(
-            create_page_title("Database Inspector", "View database status and basic info"),
             P("This development tool shows basic database information."),
             H3("Database Status:"),
             Ul(
@@ -133,4 +147,10 @@ def create_dev_routes(app, db=None, auth_service=None, email_service=None, setti
             ),
             P("For detailed database operations, use a database client or admin tool.")
         )
-        return Titled("Database Inspector", create_app_layout(content, user=user, current_page="/dev/database"))
+        return Titled("Database Inspector", create_app_layout(
+            content, 
+            user=user, 
+            current_page="/dev/database",
+            page_title="Database Inspector",
+            page_subtitle="View database status and basic info"
+        ))

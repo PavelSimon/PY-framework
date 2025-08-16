@@ -24,6 +24,7 @@ with redirect_stderr(stderr_buffer):
     from src.framework.database import Database
     from src.framework.auth import AuthenticationService
     from src.framework.email import EmailService
+    from src.framework.csrf import CSRFProtection, add_csrf_middleware
     from src.framework.routes import create_auth_routes, create_main_routes
 
 def create_production_app():
@@ -45,6 +46,10 @@ def create_production_app():
     db = Database(settings.database_url)
     auth_service = AuthenticationService(settings.secret_key)
     email_service = EmailService() if hasattr(settings, 'smtp_server') and settings.smtp_server else None
+    csrf_protection = CSRFProtection(settings.secret_key)
+    
+    # Add CSRF middleware
+    add_csrf_middleware(app, csrf_protection)
     
     # Security middleware
     @app.middleware("http")
@@ -65,8 +70,8 @@ def create_production_app():
         return response
     
     # Register route modules
-    create_auth_routes(app, db, auth_service, email_service)
-    create_main_routes(app, db, auth_service, is_development=False)
+    create_auth_routes(app, db, auth_service, email_service, csrf_protection)
+    create_main_routes(app, db, auth_service, is_development=False, csrf_protection=csrf_protection)
     
     # Mount static files
     app.mount("/static", StaticFiles(directory="static"), name="static")

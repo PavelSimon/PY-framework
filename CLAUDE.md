@@ -326,6 +326,8 @@ The framework implements a clean, modular route architecture for better maintain
 - `POST /auth/register` - User registration processing
 - `GET /auth/logout` - User logout
 - `GET /auth/verify/{token}` - Email verification
+- `GET /auth/resend-verification` - Resend verification email page
+- `POST /auth/resend-verification` - Resend verification email processing
 
 ### Main Application Routes (`src/framework/routes/main.py`)
 - `GET /` - Homepage (different for dev/prod)

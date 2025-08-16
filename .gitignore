@@ -20,7 +20,7 @@ env/
 # Database files
 *.db
 *.sqlite3
-app.db
+app.db*
 
 # IDE files
 .vscode/
@@ -28,6 +28,7 @@ app.db
 *.swp
 *.swo
 *~
+2025*
 
 # OS files
 .DS_Store

@@ -25,6 +25,7 @@ with redirect_stderr(stderr_buffer):
     from src.framework.database import Database
     from src.framework.auth import AuthenticationService
     from src.framework.email import EmailService
+    from src.framework.csrf import CSRFProtection, add_csrf_middleware
     from src.framework.routes import create_auth_routes, create_main_routes, create_dev_routes
 
 def create_dev_app():
@@ -47,11 +48,15 @@ def create_dev_app():
     db = Database(settings.database_url)
     auth_service = AuthenticationService(settings.secret_key)
     email_service = EmailService()
+    csrf_protection = CSRFProtection(settings.secret_key)
+    
+    # Add CSRF middleware
+    add_csrf_middleware(app, csrf_protection)
     
     # Register route modules
-    create_auth_routes(app, db, auth_service, email_service)
-    create_main_routes(app, db, auth_service, is_development=True)
-    create_dev_routes(app, db, auth_service, email_service, settings)
+    create_auth_routes(app, db, auth_service, email_service, csrf_protection)
+    create_main_routes(app, db, auth_service, is_development=True, csrf_protection=csrf_protection)
+    create_dev_routes(app, db, auth_service, email_service, settings, csrf_protection)
     
     # Mount static files
     app.mount("/static", StaticFiles(directory="static"), name="static")

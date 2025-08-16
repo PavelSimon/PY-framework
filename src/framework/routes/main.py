@@ -7,14 +7,13 @@ from ..layout import create_app_layout, create_auth_layout, create_page_title, c
 from ..session import get_current_user
 
 
-def create_main_routes(app, db=None, auth_service=None, is_development=False):
+def create_main_routes(app, db=None, auth_service=None, is_development=False, csrf_protection=None):
     """Register main application routes with the FastHTML app"""
     
     @app.get("/")
     def home():
         if is_development:
             content = Div(
-                create_page_title("🚀 PY-Framework Development Server", "Welcome to your secure FastHTML framework!"),
                 Div(
                     A("Get Started", href="/dashboard", cls="btn btn-primary"),
                     A("View Documentation", href="/docs", cls="btn btn-secondary"),
@@ -28,6 +27,8 @@ def create_main_routes(app, db=None, auth_service=None, is_development=False):
                     Li("✅ Authentication system ready"),
                     Li("✅ Email service configured"),
                     Li("✅ Navigation layout implemented"),
+                    Li("✅ CSRF protection enabled"),
+                    Li("✅ Profile update functionality"),
                 ),
                 H2("Test the Framework:"),
                 Ul(
@@ -37,10 +38,14 @@ def create_main_routes(app, db=None, auth_service=None, is_development=False):
                     Li(A("View Dashboard", href="/dashboard")),
                 )
             )
-            return Titled("PY-Framework Development", create_app_layout(content, current_page="home"))
+            return Titled("PY-Framework Development", create_app_layout(
+                content, 
+                current_page="home",
+                page_title="🚀 PY-Framework Development Server",
+                page_subtitle="Welcome to your secure FastHTML framework!"
+            ))
         else:
             content = Div(
-                create_page_title("🚀 PY-Framework", "A secure, robust web application framework"),
                 P("Welcome to your production-ready FastHTML framework with enterprise-grade security and modern authentication."),
                 Div(
                     A("Get Started", href="/dashboard", cls="btn btn-primary"),
@@ -57,7 +62,13 @@ def create_main_routes(app, db=None, auth_service=None, is_development=False):
                     Li("✅ Session management"),
                 )
             )
-            return Titled("Welcome to PY-Framework", create_app_layout(content, current_page="home", show_sidebar=False))
+            return Titled("Welcome to PY-Framework", create_app_layout(
+                content, 
+                current_page="home", 
+                show_sidebar=False,
+                page_title="🚀 PY-Framework",
+                page_subtitle="A secure, robust web application framework"
+            ))
     
     @app.get("/dashboard")
     def dashboard(request):
@@ -69,7 +80,6 @@ def create_main_routes(app, db=None, auth_service=None, is_development=False):
             return RedirectResponse("/auth/login", status_code=302)
         
         content = Div(
-            create_page_title("Dashboard", f"Welcome back, {user['first_name'] or user['email']}!"),
             create_success_message("You are successfully logged in to the PY-Framework!"),
             H2("👤 Your Account:"),
             Ul(
@@ -86,7 +96,8 @@ def create_main_routes(app, db=None, auth_service=None, is_development=False):
                 Li("✅ Account lockout protection (5 attempts)"),
                 Li("✅ Professional navigation layout"),
                 Li("✅ Responsive design with sidebar"),
-                Li("🔄 CSRF Protection (coming next)"),
+                Li("✅ CSRF Protection (Cross-Site Request Forgery prevention)"),
+                Li("✅ Profile Update functionality"),
                 Li("🔄 Password Reset (coming next)"),
                 Li("🔄 OAuth Integration (Google & GitHub)"),
             ),
@@ -98,7 +109,13 @@ def create_main_routes(app, db=None, auth_service=None, is_development=False):
                 cls="button-group"
             )
         )
-        return Titled("Dashboard", create_app_layout(content, user=user, current_page="/dashboard"))
+        return Titled("Dashboard", create_app_layout(
+            content, 
+            user=user, 
+            current_page="/dashboard",
+            page_title="Dashboard",
+            page_subtitle=f"Welcome back, {user['first_name'] or user['email']}!"
+        ))
     
     @app.get("/page1")
     def page1(request):
@@ -110,7 +127,6 @@ def create_main_routes(app, db=None, auth_service=None, is_development=False):
             return RedirectResponse("/auth/login", status_code=302)
         
         content = Div(
-            create_page_title("1. stránka", "This is the first page from the main menu"),
             P("This page demonstrates the navigation structure with the sidebar and top menu."),
             H3("Navigation Features:"),
             Ul(
@@ -121,7 +137,13 @@ def create_main_routes(app, db=None, auth_service=None, is_development=False):
             ),
             P("This is where your application-specific content would go.")
         )
-        return Titled("1. stránka", create_app_layout(content, user=user, current_page="/page1"))
+        return Titled("1. stránka", create_app_layout(
+            content, 
+            user=user, 
+            current_page="/page1",
+            page_title="1. stránka",
+            page_subtitle="This is the first page from the main menu"
+        ))
     
     @app.get("/profile")
     def profile(request):
@@ -132,33 +154,106 @@ def create_main_routes(app, db=None, auth_service=None, is_development=False):
             # Redirect to login if not authenticated
             return RedirectResponse("/auth/login", status_code=302)
         
+        # Create form with CSRF token if protection is enabled
+        form_elements = [
+            Div(
+                Label("First Name:", fr="first_name"),
+                Input(type="text", id="first_name", name="first_name", value=user['first_name'] or ""),
+                cls="form-group"
+            ),
+            Div(
+                Label("Last Name:", fr="last_name"),
+                Input(type="text", id="last_name", name="last_name", value=user['last_name'] or ""),
+                cls="form-group"
+            ),
+            Div(
+                Label("Email:", fr="email"),
+                Input(type="email", id="email", name="email", value=user['email'], readonly=True),
+                Small("Email cannot be changed"),
+                cls="form-group"
+            )
+        ]
+        
+        # Add CSRF token if protection is enabled
+        if csrf_protection:
+            session_id = request.cookies.get('session_id')
+            form_elements.insert(0, csrf_protection.create_csrf_input(session_id))
+        
+        form_elements.extend([
+            Button("Update Profile", type="submit", cls="btn btn-primary"),
+            A("Change Password", href="/profile/change-password", cls="btn btn-secondary")
+        ])
+        
         content = Div(
-            create_page_title("Edit Profile", "Update your account information"),
             Form(
-                Div(
-                    Label("First Name:", fr="first_name"),
-                    Input(type="text", id="first_name", name="first_name", value=user['first_name'] or ""),
-                    cls="form-group"
-                ),
-                Div(
-                    Label("Last Name:", fr="last_name"),
-                    Input(type="text", id="last_name", name="last_name", value=user['last_name'] or ""),
-                    cls="form-group"
-                ),
-                Div(
-                    Label("Email:", fr="email"),
-                    Input(type="email", id="email", name="email", value=user['email'], readonly=True),
-                    Small("Email cannot be changed"),
-                    cls="form-group"
-                ),
-                Button("Update Profile", type="submit", cls="btn btn-primary"),
-                A("Change Password", href="/profile/change-password", cls="btn btn-secondary"),
+                *form_elements,
                 action="/profile",
                 method="post",
                 cls="form"
             )
         )
-        return Titled("Edit Profile", create_app_layout(content, user=user, current_page="/profile"))
+        return Titled("Edit Profile", create_app_layout(
+            content, 
+            user=user, 
+            current_page="/profile",
+            page_title="Edit Profile",
+            page_subtitle="Update your account information"
+        ))
+    
+    @app.post("/profile")
+    def update_profile(request, first_name: str = None, last_name: str = None, csrf_token: str = None):
+        # Get current user from session
+        user = get_current_user(request, db, auth_service)
+        
+        if not user:
+            return RedirectResponse("/auth/login", status_code=302)
+        
+        try:
+            # Validate CSRF token if protection is enabled
+            if csrf_protection:
+                session_id = request.cookies.get('session_id')
+                if not csrf_protection.validate_token(csrf_token, session_id):
+                    content = Div(
+                        create_error_message("Invalid security token. Please try again."),
+                        P(A("Back to Profile", href="/profile", cls="btn btn-primary"))
+                    )
+                    return Titled("Security Error", create_app_layout(
+                        content, 
+                        user=user,
+                        page_title="Security Error",
+                        page_subtitle="Invalid security token"
+                    ))
+            
+            # Update user profile in database
+            db.conn.execute("""
+                UPDATE users 
+                SET first_name = ?, last_name = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            """, [first_name, last_name, user['id']])
+            
+            content = Div(
+                create_success_message("Your profile has been updated successfully."),
+                P(A("Back to Profile", href="/profile", cls="btn btn-primary")),
+                P(A("Go to Dashboard", href="/dashboard", cls="btn btn-secondary"))
+            )
+            return Titled("Profile Updated", create_app_layout(
+                content, 
+                user=user,
+                page_title="Profile Updated! ✅",
+                page_subtitle="Your changes have been saved"
+            ))
+            
+        except Exception as e:
+            content = Div(
+                create_error_message(f"Failed to update profile: {str(e)}"),
+                P(A("Back to Profile", href="/profile", cls="btn btn-primary"))
+            )
+            return Titled("Update Failed", create_app_layout(
+                content, 
+                user=user,
+                page_title="Update Failed",
+                page_subtitle="An error occurred while updating your profile"
+            ))
     
     @app.get("/health")
     def health_check():

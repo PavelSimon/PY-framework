@@ -30,6 +30,13 @@ body {
     background-color: var(--background-color);
 }
 
+/* Hide FastHTML's automatic H1 that appears before our layout */
+body > main > h1:first-child,
+body > .container > h1:first-child,
+body > h1:first-child {
+    display: none;
+}
+
 .container {
     max-width: 1200px;
     margin: 0 auto;
@@ -425,10 +432,40 @@ li {
     font-size: 0.875rem;
 }
 
+/* Page Title Section */
+.page-title-section {
+    background: var(--surface-color);
+    border-bottom: 1px solid var(--border-color);
+    padding: 1.5rem 2rem;
+}
+
+.page-title-section .page-header {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.page-title-section h1 {
+    margin-bottom: 0.5rem;
+    color: var(--text-color);
+}
+
+.page-title-section .text-muted {
+    color: var(--text-muted);
+    margin-bottom: 0;
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
     .container {
         padding: 1rem;
+    }
+    
+    .page-title-section {
+        padding: 1rem;
+    }
+    
+    .page-title-section h1 {
+        font-size: 1.75rem;
     }
     
     .form {
