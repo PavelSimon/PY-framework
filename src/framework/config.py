@@ -1,0 +1,68 @@
+import os
+import secrets
+from pydantic_settings import BaseSettings
+from pydantic import EmailStr, field_validator, ConfigDict
+from typing import Optional, List
+
+
+class Settings(BaseSettings):
+    model_config = ConfigDict(
+        env_file=".env",
+        env_file_encoding='utf-8'
+    )
+    
+    app_name: str = "PY-Framework"
+    debug: bool = False
+    secret_key: str = secrets.token_urlsafe(32)
+    
+    database_url: str = "app.db"
+    
+    session_expire_hours: int = 24
+    
+    google_client_id: Optional[str] = None
+    google_client_secret: Optional[str] = None
+    google_redirect_uri: str = "http://localhost:8000/auth/google/callback"
+    
+    github_client_id: Optional[str] = None
+    github_client_secret: Optional[str] = None
+    github_redirect_uri: str = "http://localhost:8000/auth/github/callback"
+    
+    smtp_server: Optional[str] = None
+    smtp_port: int = 587
+    smtp_username: Optional[str] = None
+    smtp_password: Optional[str] = None
+    smtp_use_tls: bool = True
+    
+    from_email: Optional[EmailStr] = None
+    
+    max_failed_login_attempts: int = 5
+    account_lockout_duration_minutes: int = 30
+    
+    rate_limit_requests: int = 100
+    rate_limit_window_minutes: int = 15
+    
+    password_reset_expire_hours: int = 1
+    email_verification_expire_hours: int = 24
+    
+    cors_origins: str = "http://localhost:3000,http://localhost:8000"
+    
+    @field_validator('secret_key')
+    @classmethod
+    def validate_secret_key(cls, v):
+        if len(v) < 32:
+            raise ValueError('Secret key must be at least 32 characters long')
+        return v
+    
+    @field_validator('cors_origins')
+    @classmethod
+    def validate_cors_origins(cls, v):
+        if isinstance(v, str):
+            return [origin.strip() for origin in v.split(',') if origin.strip()]
+        return v
+
+
+def get_settings() -> Settings:
+    return Settings()
+
+
+settings = get_settings()
