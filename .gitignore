@@ -17,6 +17,7 @@ env/
 .env.local
 .env.production
 .sesskey
+nul
 
 # Database files
 *.db

@@ -2,7 +2,9 @@
 
 ## 🚀 Production Deployment Guide
 
-This guide covers deploying PY-Framework to production with security best practices and performance optimizations.
+This guide covers deploying PY-Framework to production with security best practices, performance optimizations, and Docker containerization support.
+
+**✅ LATEST UPDATE**: Enhanced with Docker support, database constraint fixes, and performance monitoring.
 
 ## Pre-Deployment Checklist
 
@@ -32,6 +34,20 @@ This guide covers deploying PY-Framework to production with security best practi
 - [ ] Admin dashboard access secured
 - [ ] Log retention policy set
 - [ ] Security event monitoring enabled
+
+### Database Requirements ✅ LATEST
+- [ ] Database constraints verified and functional
+- [ ] Role-based access control working correctly
+- [ ] Foreign key constraints resolved
+- [ ] Database schema integrity validated
+- [ ] Connection pooling configured
+
+### Docker Requirements ✅ NEW
+- [ ] Docker images built and tested
+- [ ] Container security hardening applied
+- [ ] Volume mounting for persistent data
+- [ ] Health checks configured
+- [ ] Resource limits set
 
 ## Environment Configuration
 
@@ -91,7 +107,27 @@ openssl rand -base64 32
 
 ## Deployment Options
 
-### Option 1: Traditional Server Deployment
+### Option 1: Docker Deployment (Recommended) ✅ NEW
+
+Docker provides the easiest and most reliable deployment method with built-in dependency management and security hardening.
+
+**Quick Start:**
+```bash
+# Clone repository
+git clone <your-repo-url>
+cd PY-framework
+
+# Configure environment
+cp .env.example .env
+# Edit .env with your settings
+
+# Deploy with Docker Compose
+docker-compose up -d
+```
+
+**For detailed Docker deployment instructions, see [Docker Guide](DOCKER.md)**
+
+### Option 2: Traditional Server Deployment
 
 #### 1. Server Setup
 ```bash
@@ -343,6 +379,15 @@ db = Database('production.db')
 # Database will auto-create tables on first run
 "
 ```
+
+### Database Constraint Issues ✅ RESOLVED
+**Note**: Previous versions had foreign key constraint issues preventing role updates. This has been resolved in the latest version:
+- Foreign key constraints on `users.role_id` have been fixed
+- Role-based access control now works seamlessly
+- All user data and relationships are preserved
+- Database schema integrity is maintained
+
+If upgrading from an earlier version, the framework will automatically handle schema migrations.
 
 ## Monitoring and Logging
 

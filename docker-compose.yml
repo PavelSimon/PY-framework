@@ -1,0 +1,90 @@
+# Docker Compose configuration for PY-Framework
+# Supports both development and production environments
+
+version: '3.8'
+
+services:
+  # Main application service
+  pyframework:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: pyframework-app
+    ports:
+      - "8000:8000"
+    environment:
+      - DEBUG=False
+      - SECRET_KEY=${SECRET_KEY:-please-change-this-secret-key-for-production}
+      - DATABASE_URL=/app/data/app.db
+      - ENABLE_PERFORMANCE_OPTIMIZATION=true
+      - ENABLE_AUDIT_LOGGING=true
+      # Email settings (optional)
+      - SMTP_SERVER=${SMTP_SERVER:-}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USE_TLS=${SMTP_USE_TLS:-True}
+      - SMTP_USERNAME=${SMTP_USERNAME:-}
+      - SMTP_PASSWORD=${SMTP_PASSWORD:-}
+      - FROM_EMAIL=${FROM_EMAIL:-}
+      # OAuth settings (optional)
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
+      - GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID:-}
+      - GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET:-}
+      # Security settings
+      - MAX_FAILED_LOGIN_ATTEMPTS=${MAX_FAILED_LOGIN_ATTEMPTS:-5}
+      - ACCOUNT_LOCKOUT_DURATION_MINUTES=${ACCOUNT_LOCKOUT_DURATION_MINUTES:-30}
+      - SESSION_EXPIRE_HOURS=${SESSION_EXPIRE_HOURS:-24}
+    volumes:
+      # Persistent database storage
+      - ./data:/app/data
+      # Persistent logs
+      - ./logs:/app/logs
+      # Mount source code for development (comment out for production)
+      # - ./src:/app/src
+      # - ./static:/app/static
+      # - ./templates:/app/templates
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Development service with hot reload
+  pyframework-dev:
+    profiles: ["dev"]
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: pyframework-dev
+    ports:
+      - "8000:8000"
+    environment:
+      - DEBUG=True
+      - SECRET_KEY=development-secret-key-not-for-production
+      - DATABASE_URL=/app/data/app.db
+      - ENABLE_PERFORMANCE_OPTIMIZATION=true
+      - ENABLE_AUDIT_LOGGING=true
+    volumes:
+      # Mount source code for hot reload
+      - ./src:/app/src
+      - ./static:/app/static
+      - ./templates:/app/templates
+      - ./data:/app/data
+      - ./logs:/app/logs
+      # Mount dev.py for development server
+      - ./dev.py:/app/dev.py
+    restart: unless-stopped
+    command: ["python", "dev.py"]
+
+volumes:
+  # Named volumes for data persistence
+  pyframework_data:
+    driver: local
+  pyframework_logs:
+    driver: local
+
+networks:
+  default:
+    name: pyframework-network

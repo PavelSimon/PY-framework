@@ -1,0 +1,52 @@
+# PY-Framework Development Dockerfile
+# Optimized for development with hot reloading
+
+FROM python:3.13-slim
+
+# Set environment variables
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONPATH=/app \
+    PORT=8000
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    curl \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install uv for fast Python package management
+RUN pip install uv
+
+# Set work directory
+WORKDIR /app
+
+# Copy dependency files
+COPY pyproject.toml ./
+
+# Install Python dependencies (including dev dependencies)
+RUN uv sync --dev
+
+# Add virtual environment to path
+ENV PATH="/app/.venv/bin:$PATH"
+
+# Create necessary directories
+RUN mkdir -p logs data static templates src
+
+# Copy application files (will be overridden by volume mounts in development)
+COPY src/ ./src/
+COPY static/ ./static/
+COPY templates/ ./templates/
+COPY dev.py ./
+COPY app.py ./
+COPY .env.example ./.env
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
+
+# Expose port
+EXPOSE 8000
+
+# Run the development server with hot reload
+CMD ["python", "dev.py"]

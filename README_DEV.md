@@ -47,6 +47,7 @@ uv run python dev_simple.py
 
 ## Development Workflow
 
+### Option 1: Local Development
 1. **Start development server**:
    ```bash
    uv run python dev.py
@@ -55,6 +56,21 @@ uv run python dev_simple.py
 2. **Make code changes** - server will automatically restart
 
 3. **Test your changes** at http://localhost:8000
+
+### Option 2: Docker Development ✅ NEW
+1. **Start development container**:
+   ```bash
+   docker-compose --profile dev up -d
+   ```
+
+2. **Make code changes** - changes are live-reloaded via volume mounts
+
+3. **Test your changes** at http://localhost:8000
+
+4. **View logs**:
+   ```bash
+   docker-compose --profile dev logs -f pyframework-dev
+   ```
 
 4. **Use development tools**:
    - Email testing: http://localhost:8000/dev/test-email

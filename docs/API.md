@@ -4,6 +4,8 @@
 
 This document provides comprehensive documentation for all API endpoints in the PY-Framework.
 
+**✅ LATEST UPDATE**: Enhanced with performance monitoring endpoints, audit logging APIs, and database constraint fixes.
+
 ## Base URL
 
 - **Development**: `http://localhost:8000`
@@ -306,6 +308,99 @@ csrf_token: string (required if CSRF enabled) - CSRF protection token
   "version": "0.1.0"
 }
 ```
+
+## Audit & Performance Endpoints ✅ NEW
+
+*Available for administrators only*
+
+### Audit Logging
+
+#### `GET /admin/audit`
+**Description**: Security audit dashboard with comprehensive logging
+**Authentication**: Session required
+**Role Requirements**: Administrator (role_id = 0)
+**Response**: HTML audit dashboard with security events, user activity tracking, and system monitoring
+
+**Features**:
+- Real-time security event monitoring
+- User action tracking and analysis
+- Admin activity logging
+- Security threat detection
+- Filtering and search capabilities
+
+#### `GET /admin/audit/users`
+**Description**: User-specific audit activity monitoring
+**Authentication**: Session required
+**Role Requirements**: Administrator (role_id = 0)
+**Response**: HTML page with detailed user activity logs
+
+#### `GET /admin/audit/stats`
+**Description**: System audit statistics and analytics
+**Authentication**: Session required
+**Role Requirements**: Administrator (role_id = 0)
+**Response**: HTML page with audit statistics, trends, and security metrics
+
+#### `GET /admin/audit/export`
+**Description**: Export audit logs for compliance and analysis
+**Authentication**: Session required
+**Role Requirements**: Administrator (role_id = 0)
+**Response**: Downloadable audit log export (CSV/JSON format)
+
+### Performance Monitoring
+
+#### `GET /admin/performance`
+**Description**: Real-time performance monitoring dashboard
+**Authentication**: Session required
+**Role Requirements**: Administrator (role_id = 0)
+**Response**: HTML performance dashboard with metrics, optimization tools, and system health
+
+**Features**:
+- Database performance metrics
+- Memory usage monitoring
+- Request/response time tracking
+- Connection pool statistics
+- Performance optimization tools
+
+#### `GET /admin/performance/api/stats`
+**Description**: Performance API statistics endpoint
+**Authentication**: Session required
+**Role Requirements**: Administrator (role_id = 0)
+**Response** (JSON):
+```json
+{
+  "database": {
+    "connections_active": 5,
+    "connections_max": 10,
+    "query_avg_time": 12.5
+  },
+  "cache": {
+    "hit_rate": 85.2,
+    "entries": 245,
+    "max_entries": 1000
+  },
+  "requests": {
+    "total": 1523,
+    "avg_response_time": 45.2,
+    "errors": 3
+  }
+}
+```
+
+#### `POST /admin/performance/optimize`
+**Description**: Run database optimization tasks
+**Authentication**: Session required
+**Role Requirements**: Administrator (role_id = 0)
+**Request Body** (form data):
+```
+csrf_token: string (required) - CSRF protection token
+optimization_type: string (required) - Type of optimization to run
+```
+
+#### `GET /admin/performance/clear-cache`
+**Description**: Clear performance caches
+**Authentication**: Session required
+**Role Requirements**: Administrator (role_id = 0)
+**Response**: Redirect with success/error message
 
 ## Development Endpoints
 
@@ -759,6 +854,7 @@ user_id: integer (required) - ID of user to edit
 - Admin cannot edit their own role
 - CSRF protection enabled
 - Role validation on target user
+- **Database constraints resolved** ✅ LATEST - Role updates now work seamlessly
 
 #### `POST /users/{user_id}/edit-role`
 **Description**: Update user role

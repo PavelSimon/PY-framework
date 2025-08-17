@@ -1,0 +1,75 @@
+# Git and version control
+.git
+.gitignore
+.gitattributes
+
+# Documentation
+*.md
+docs/
+README*
+
+# Python cache and virtual environments
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+.venv
+venv/
+env/
+.env.local
+.env.development
+.env.test
+.env.production
+
+# Database files (will be mounted as volumes)
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+data/
+
+# Logs (will be mounted as volumes)
+logs/
+*.log
+
+# Test files
+tests/
+.pytest_cache/
+.coverage
+.tox/
+htmlcov/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Docker files (except the ones we need)
+Dockerfile.dev
+docker-compose*.yml
+.dockerignore
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Node.js (if any)
+node_modules/
+npm-debug.log*
+
+# Build artifacts
+dist/
+build/

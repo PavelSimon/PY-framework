@@ -1045,8 +1045,11 @@ def create_main_routes(app, db=None, auth_service=None, is_development=False, cs
             user_sessions_cleared = False
             
             try:
-                # First try direct update
-                success = db.update_user_role(user_id, role_id)
+                # First try direct update (use cached version if available)
+                if hasattr(db, 'update_user_role_cached'):
+                    success = db.update_user_role_cached(user_id, role_id)
+                else:
+                    success = db.update_user_role(user_id, role_id)
             except Exception as e:
                 if "foreign key constraint" in str(e).lower():
                     print(f"Role update failed due to foreign key constraints for user {user_id}, clearing references...")
@@ -1064,7 +1067,10 @@ def create_main_routes(app, db=None, auth_service=None, is_development=False, cs
                         user_sessions_cleared = True
                         
                         # Try role update again after clearing references
-                        success = db.update_user_role(user_id, role_id)
+                        if hasattr(db, 'update_user_role_cached'):
+                            success = db.update_user_role_cached(user_id, role_id)
+                        else:
+                            success = db.update_user_role(user_id, role_id)
                         
                         if success:
                             print(f"Role update succeeded after clearing references for user {user_id}")
@@ -1077,6 +1083,29 @@ def create_main_routes(app, db=None, auth_service=None, is_development=False, cs
                     success = False
             
             if success:
+                # Log admin action for audit purposes
+                try:
+                    from ..audit import get_audit_service, AuditEventType
+                    audit_service = get_audit_service(db)
+                    client_ip = request.client.host if hasattr(request, 'client') else None
+                    user_agent = request.headers.get('user-agent', '')
+                    
+                    audit_service.log_admin_event(
+                        event_type=AuditEventType.USER_ROLE_CHANGED,
+                        admin_user_id=user['id'],
+                        target_user_id=user_id,
+                        ip_address=client_ip,
+                        user_agent=user_agent,
+                        details={
+                            'previous_role': target_user.get('role_name', 'Unknown'),
+                            'new_role': 'Administrator' if role_id == 0 else 'Regular User',
+                            'new_role_id': role_id,
+                            'sessions_cleared': user_sessions_cleared
+                        }
+                    )
+                except Exception as audit_error:
+                    print(f"Failed to log role change audit event: {audit_error}")
+                
                 role_name = "Administrator" if role_id == 0 else "Regular User"
                 success_msg = f"User role updated to {role_name} successfully."
                 if user_sessions_cleared:
