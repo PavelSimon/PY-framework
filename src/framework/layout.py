@@ -72,6 +72,10 @@ def create_sidebar(menu_items: List[Dict] = None, current_page: str = ""):
                 {"name": "Users", "url": "/users", "icon": "👥"},
                 {"name": "Settings", "url": "/settings", "icon": "⚙️"},
             ]},
+            {"title": "Admin", "items": [
+                {"name": "Audit Logs", "url": "/admin/audit", "icon": "📋"},
+                {"name": "Performance", "url": "/admin/performance", "icon": "⚡"},
+            ]},
             {"title": "Development", "items": [
                 {"name": "Test Email", "url": "/dev/test-email", "icon": "📧"},
                 {"name": "Test Auth", "url": "/dev/test-auth", "icon": "🔐"},

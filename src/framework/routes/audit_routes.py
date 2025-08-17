@@ -9,18 +9,45 @@ from ..database.database import Database
 def create_audit_routes(app, db: Database, auth_service=None):
     """Create audit and monitoring routes"""
     
+    def get_admin_sidebar_items():
+        """Get sidebar items for admin users"""
+        return [
+            {"title": "Main", "items": [
+                {"name": "Dashboard", "url": "/dashboard", "icon": "📊"},
+                {"name": "Users", "url": "/users", "icon": "👥"},
+                {"name": "Settings", "url": "/settings", "icon": "⚙️"},
+            ]},
+            {"title": "Administration", "items": [
+                {"name": "Audit Dashboard", "url": "/admin/audit", "icon": "🔒"},
+                {"name": "User Activity", "url": "/admin/audit/users", "icon": "👥"},
+                {"name": "System Stats", "url": "/admin/audit/stats", "icon": "📊"},
+            ]},
+            {"title": "Development", "items": [
+                {"name": "Test Email", "url": "/dev/test-email", "icon": "📧"},
+                {"name": "Test Auth", "url": "/dev/test-auth", "icon": "🔐"},
+                {"name": "Database", "url": "/dev/database", "icon": "🗄️"},
+            ]}
+        ]
+    
     @app.get("/admin/audit")
-    @require_auth
-    def audit_dashboard(session):
+    def audit_dashboard(request):
         """Admin audit dashboard with security monitoring"""
-        user = session['user']
+        user = get_current_user(request, db, auth_service)
+        
+        if not user:
+            return RedirectResponse("/auth/login", status_code=302)
         
         # Check if user is admin
         if user.get('role_id') != 0:
-            return create_layout(
+            access_denied_content = Div(
                 H1("Access Denied"),
                 P("This page is only available to administrators."),
-                title="Access Denied"
+                cls="access-denied"
+            )
+            return create_app_layout(
+                content=access_denied_content,
+                title="Access Denied",
+                user=user
             )
         
         try:
@@ -76,7 +103,7 @@ def create_audit_routes(app, db: Database, auth_service=None):
                 cls="col-md-6"
             )
             
-            return create_layout(
+            dashboard_content = Div(
                 H1("🔒 Security Audit Dashboard"),
                 P("Monitor security events and system activity", cls="lead"),
                 
@@ -95,29 +122,48 @@ def create_audit_routes(app, db: Database, auth_service=None):
                     A("System Statistics", href="/admin/audit/stats", cls="btn btn-info"),
                     cls="mb-4"
                 ),
-                
-                title="Security Audit Dashboard"
+                cls="audit-dashboard"
+            )
+            
+            return create_app_layout(
+                content=dashboard_content,
+                title="Security Audit Dashboard",
+                user=user,
+                sidebar_items=get_admin_sidebar_items(),
+                current_page="/admin/audit"
             )
             
         except Exception as e:
-            return create_layout(
+            error_content = Div(
                 H1("Audit Dashboard Error"),
                 P(f"Error loading audit dashboard: {str(e)}"),
-                title="Error"
+                cls="error-page"
+            )
+            return create_app_layout(
+                content=error_content,
+                title="Error",
+                user=user
             )
     
     @app.get("/admin/audit/users")
-    @require_auth
-    def audit_users(session, user_id: Optional[int] = None, limit: int = 50):
+    def audit_users(request, user_id: Optional[int] = None, limit: int = 50):
         """User activity audit page"""
-        user = session['user']
+        user = get_current_user(request, db, auth_service)
+        
+        if not user:
+            return RedirectResponse("/auth/login", status_code=302)
         
         # Check if user is admin
         if user.get('role_id') != 0:
-            return create_layout(
+            access_denied_content = Div(
                 H1("Access Denied"),
                 P("This page is only available to administrators."),
-                title="Access Denied"
+                cls="access-denied"
+            )
+            return create_app_layout(
+                content=access_denied_content,
+                title="Access Denied",
+                user=user
             )
         
         try:
@@ -193,27 +239,46 @@ def create_audit_routes(app, db: Database, auth_service=None):
                 else:
                     content.append(P("No activity found for this user."))
             
-            return create_layout(*content, title="User Activity Audit")
+            main_content = Div(*content, cls="audit-users-page")
+            return create_app_layout(
+                content=main_content,
+                title="User Activity Audit", 
+                user=user, 
+                sidebar_items=get_admin_sidebar_items(), 
+                current_page="/admin/audit/users"
+            )
             
         except Exception as e:
-            return create_layout(
+            error_content = Div(
                 H1("User Audit Error"),
                 P(f"Error loading user activity: {str(e)}"),
-                title="Error"
+                cls="error-page"
+            )
+            return create_app_layout(
+                content=error_content,
+                title="Error",
+                user=user
             )
     
     @app.get("/admin/audit/stats")
-    @require_auth
-    def audit_statistics(session, days: int = 30):
+    def audit_statistics(request, days: int = 30):
         """System audit statistics"""
-        user = session['user']
+        user = get_current_user(request, db, auth_service)
+        
+        if not user:
+            return RedirectResponse("/auth/login", status_code=302)
         
         # Check if user is admin
         if user.get('role_id') != 0:
-            return create_layout(
+            access_denied_content = Div(
                 H1("Access Denied"),
                 P("This page is only available to administrators."),
-                title="Access Denied"
+                cls="access-denied"
+            )
+            return create_app_layout(
+                content=access_denied_content,
+                title="Access Denied",
+                user=user
             )
         
         try:
@@ -262,7 +327,7 @@ def create_audit_routes(app, db: Database, auth_service=None):
                 cls="col-md-4 mb-3"
             )
             
-            return create_layout(
+            stats_content = Div(
                 H1("📊 System Statistics"),
                 P(f"Security and activity statistics for the last {days} days", cls="lead"),
                 period_form,
@@ -274,32 +339,54 @@ def create_audit_routes(app, db: Database, auth_service=None):
                 
                 H3("Security Event Summary"),
                 Ul(*[Li(f"{event_type.replace('_', ' ').title()}: {count}") for event_type, count in event_counts.items()]) if event_counts else P("No security events recorded."),
-                
-                title="System Statistics"
+                cls="audit-statistics"
+            )
+            
+            return create_app_layout(
+                content=stats_content,
+                title="System Statistics",
+                user=user,
+                sidebar_items=get_admin_sidebar_items(),
+                current_page="/admin/audit/stats"
             )
             
         except Exception as e:
-            return create_layout(
+            error_content = Div(
                 H1("Statistics Error"),
                 P(f"Error loading statistics: {str(e)}"),
-                title="Error"
+                cls="error-page"
+            )
+            return create_app_layout(
+                content=error_content,
+                title="Error",
+                user=user
             )
     
     @app.get("/admin/audit/export")
-    @require_auth
-    def export_audit_log(session, days: int = 30, format: str = "csv"):
+    def export_audit_log(request, days: int = 30, format: str = "csv"):
         """Export audit log data"""
-        user = session['user']
+        user = get_current_user(request, db, auth_service)
+        
+        if not user:
+            return RedirectResponse("/auth/login", status_code=302)
         
         # Check if user is admin
         if user.get('role_id') != 0:
             return Response("Access denied", status_code=403)
         
         # For now, return a simple response indicating this feature is coming soon
-        return create_layout(
+        export_content = Div(
             H1("🔽 Export Audit Log"),
             P("Export functionality is coming soon.", cls="lead"),
             P("This feature will allow you to export audit logs in various formats (CSV, JSON) for external analysis."),
             A("Back to Audit Dashboard", href="/admin/audit", cls="btn btn-primary"),
-            title="Export Audit Log"
+            cls="audit-export"
+        )
+        
+        return create_app_layout(
+            content=export_content,
+            title="Export Audit Log",
+            user=user,
+            sidebar_items=get_admin_sidebar_items(),
+            current_page="/admin/audit/export"
         )

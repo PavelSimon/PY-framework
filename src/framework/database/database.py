@@ -139,31 +139,20 @@ class Database:
             try:
                 # Column doesn't exist, add it
                 self._conn.execute("ALTER TABLE users ADD COLUMN role_id INTEGER DEFAULT 1")
-                print("✅ Successfully added role_id column to users table")
+                print("SUCCESS: Successfully added role_id column to users table")
                 
                 # Update existing users to have the default role
                 self._conn.execute("UPDATE users SET role_id = 1 WHERE role_id IS NULL")
-                print("✅ Updated existing users with default role")
+                print("SUCCESS: Updated existing users with default role")
                 
             except Exception as migration_error:
-                print(f"❌ Migration failed: {migration_error}")
-                print("⚠️  Database schema migration required!")
+                print(f"ERROR: Migration failed: {migration_error}")
+                print("WARNING: Database schema migration required!")
                 print("To fix: Stop the server, delete app.db, and restart to recreate with correct schema")
                 # Continue execution - the error will surface when trying to use role features
         
-        # Ensure Pavel@pavel-simon.com is admin (role_id = 0)
-        self._conn.execute("""
-            UPDATE users 
-            SET role_id = 0 
-            WHERE email = 'Pavel@pavel-simon.com' AND role_id != 0
-        """)
-        
-        # Ensure all other users are regular users (role_id = 1)
-        self._conn.execute("""
-            UPDATE users 
-            SET role_id = 1 
-            WHERE email != 'Pavel@pavel-simon.com' AND role_id != 1
-        """)
+        # Note: Automatic role assignment removed due to foreign key constraints
+        # Use make_admin.py script or manual database update to assign admin roles
         
         self._conn.execute("""
             CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
@@ -251,15 +240,15 @@ class Database:
             try:
                 # Column doesn't exist, add it
                 self._conn.execute("ALTER TABLE users ADD COLUMN two_factor_enabled BOOLEAN DEFAULT FALSE")
-                print("✅ Successfully added two_factor_enabled column to users table")
+                print("SUCCESS: Successfully added two_factor_enabled column to users table")
                 
                 # Update existing users to have 2FA disabled by default
                 self._conn.execute("UPDATE users SET two_factor_enabled = FALSE WHERE two_factor_enabled IS NULL")
-                print("✅ Updated existing users with 2FA disabled by default")
+                print("SUCCESS: Updated existing users with 2FA disabled by default")
                 
             except Exception as migration_error:
-                print(f"❌ 2FA Migration failed: {migration_error}")
-                print("⚠️  Database schema migration required!")
+                print(f"ERROR: 2FA Migration failed: {migration_error}")
+                print("WARNING: Database schema migration required!")
                 # Continue execution - the error will surface when trying to use 2FA features
 
     def create_user(self, email: str, password_hash: str, first_name: str = None, last_name: str = None) -> int:
@@ -582,11 +571,46 @@ class Database:
                 except Exception as e:
                     print(f"Could not check table {table}: {e}")
             
+            # Check for any foreign key constraints pointing to this user
+            try:
+                # Get all foreign key constraints in the database
+                fk_result = self.conn.execute("""
+                    SELECT 
+                        tc.constraint_name,
+                        tc.table_name,
+                        kcu.column_name,
+                        ccu.table_name AS foreign_table_name,
+                        ccu.column_name AS foreign_column_name
+                    FROM 
+                        information_schema.table_constraints AS tc 
+                        JOIN information_schema.key_column_usage AS kcu
+                            ON tc.constraint_name = kcu.constraint_name
+                            AND tc.table_schema = kcu.table_schema
+                        JOIN information_schema.constraint_column_usage AS ccu
+                            ON ccu.constraint_name = tc.constraint_name
+                            AND ccu.table_schema = tc.table_schema
+                    WHERE tc.constraint_type = 'FOREIGN KEY'
+                    AND ccu.table_name = 'users'
+                    AND ccu.column_name = 'id'
+                """)
+                
+                foreign_keys = fk_result.fetchall()
+                if foreign_keys:
+                    print(f"Found {len(foreign_keys)} foreign key constraints referencing users.id:")
+                    for fk in foreign_keys:
+                        print(f"  {fk[1]}.{fk[2]} -> {fk[3]}.{fk[4]} (constraint: {fk[0]})")
+                else:
+                    print("No foreign key constraints found referencing users.id")
+                    
+            except Exception as e:
+                print(f"Could not check foreign key constraints: {e}")
+            
             # Start transaction for atomicity
             self.conn.execute("BEGIN TRANSACTION")
             
             # Delete in correct order - using explicit table list
             tables_to_clean = [
+                'audit_events',  # Clean audit events first (no foreign key constraints)
                 'sessions',
                 'email_verification_tokens', 
                 'password_reset_tokens',
@@ -598,6 +622,16 @@ class Database:
             
             for table in tables_to_clean:
                 try:
+                    # Check if table exists first
+                    table_check = self.conn.execute("""
+                        SELECT COUNT(*) FROM information_schema.tables 
+                        WHERE table_name = ?
+                    """, [table])
+                    
+                    if table_check.fetchone()[0] == 0:
+                        print(f"Table {table} does not exist, skipping...")
+                        continue
+                    
                     # Count first
                     count_result = self.conn.execute(f"SELECT COUNT(*) FROM {table} WHERE user_id = ?", [user_id])
                     count = count_result.fetchone()[0]

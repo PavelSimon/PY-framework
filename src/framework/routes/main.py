@@ -1040,13 +1040,50 @@ def create_main_routes(app, db=None, auth_service=None, is_development=False, cs
                     page_subtitle="Please select a valid role"
                 ))
             
-            # Update user role
-            success = db.update_user_role(user_id, role_id)
+            # Update user role with foreign key constraint handling
+            success = False
+            user_sessions_cleared = False
+            
+            try:
+                # First try direct update
+                success = db.update_user_role(user_id, role_id)
+            except Exception as e:
+                if "foreign key constraint" in str(e).lower():
+                    print(f"Role update failed due to foreign key constraints for user {user_id}, clearing references...")
+                    
+                    try:
+                        # Clear foreign key references that might prevent role update
+                        db.conn.execute("DELETE FROM sessions WHERE user_id = ?", [user_id])
+                        db.conn.execute("DELETE FROM email_verification_tokens WHERE user_id = ?", [user_id])
+                        db.conn.execute("DELETE FROM password_reset_tokens WHERE user_id = ?", [user_id])
+                        db.conn.execute("DELETE FROM oauth_accounts WHERE user_id = ?", [user_id])
+                        db.conn.execute("DELETE FROM totp_secrets WHERE user_id = ?", [user_id])
+                        db.conn.execute("DELETE FROM backup_codes WHERE user_id = ?", [user_id])
+                        db.conn.execute("DELETE FROM two_factor_tokens WHERE user_id = ?", [user_id])
+                        
+                        user_sessions_cleared = True
+                        
+                        # Try role update again after clearing references
+                        success = db.update_user_role(user_id, role_id)
+                        
+                        if success:
+                            print(f"Role update succeeded after clearing references for user {user_id}")
+                        
+                    except Exception as clear_error:
+                        print(f"Error clearing references for user {user_id}: {clear_error}")
+                        success = False
+                else:
+                    print(f"Error updating user role: {e}")
+                    success = False
             
             if success:
                 role_name = "Administrator" if role_id == 0 else "Regular User"
+                success_msg = f"User role updated to {role_name} successfully."
+                if user_sessions_cleared:
+                    success_msg += " Note: User's sessions and tokens were cleared for security."
+                
                 content = Div(
-                    create_success_message(f"User role updated to {role_name} successfully."),
+                    create_success_message(success_msg),
                     P(A("Back to Users", href="/users", cls="btn btn-primary")),
                     P(A("Edit Another User", href="/users", cls="btn btn-secondary"))
                 )

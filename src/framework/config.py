@@ -49,6 +49,17 @@ class Settings(BaseSettings):
     audit_log_file: Optional[str] = "logs/audit.log"
     audit_retention_days: int = 90
     
+    # Performance settings
+    enable_performance_optimization: bool = True
+    cache_default_ttl_seconds: int = 300  # 5 minutes
+    cache_max_size: int = 1000
+    session_cache_max_sessions: int = 1000
+    session_cache_cleanup_interval_seconds: int = 3600  # 1 hour
+    connection_pool_max_connections: int = 10
+    query_slow_threshold_ms: float = 100.0
+    enable_query_optimization: bool = True
+    enable_connection_pooling: bool = True
+    
     @field_validator('secret_key')
     @classmethod
     def validate_secret_key(cls, v):

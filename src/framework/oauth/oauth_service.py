@@ -271,9 +271,27 @@ class OAuthService:
     def validate_state_token(self, state: str, provider: str) -> bool:
         """Validate OAuth state token"""
         if not state:
+            print(f"OAuth state validation failed: No state token provided")
             return False
         
         try:
+            # Debug: Check if table exists
+            try:
+                cursor = self.db.conn.execute("""
+                    SELECT COUNT(*) FROM oauth_state_tokens
+                """)
+                total_tokens = cursor.fetchone()[0]
+                print(f"OAuth state validation: Found {total_tokens} total state tokens in database")
+            except Exception as table_error:
+                print(f"OAuth state validation: Table access error: {table_error}")
+                # For development, if table doesn't exist, create it
+                try:
+                    self.db._init_schema()  # Re-initialize schema
+                    print("OAuth state validation: Re-initialized database schema")
+                except Exception as init_error:
+                    print(f"OAuth state validation: Schema init error: {init_error}")
+                    return False
+            
             cursor = self.db.conn.execute("""
                 SELECT provider, expires_at FROM oauth_state_tokens 
                 WHERE state_token = ?
@@ -281,12 +299,22 @@ class OAuthService:
             
             row = cursor.fetchone()
             if not row:
+                print(f"OAuth state validation failed: State token '{state[:8]}...' not found in database")
+                # Debug: Show all tokens
+                try:
+                    cursor = self.db.conn.execute("SELECT state_token, provider, expires_at FROM oauth_state_tokens ORDER BY created_at DESC LIMIT 5")
+                    recent_tokens = cursor.fetchall()
+                    print(f"Recent state tokens: {[(t[0][:8], t[1], t[2]) for t in recent_tokens]}")
+                except Exception as debug_error:
+                    print(f"Debug query failed: {debug_error}")
                 return False
             
             stored_provider, expires_at = row
+            print(f"OAuth state validation: Found token for provider '{stored_provider}', expires at {expires_at}")
             
             # Check expiration
             if datetime.now() > expires_at:
+                print(f"OAuth state validation failed: Token expired at {expires_at}")
                 # Clean up expired token
                 self.db.conn.execute("""
                     DELETE FROM oauth_state_tokens WHERE state_token = ?
@@ -295,6 +323,7 @@ class OAuthService:
             
             # Check provider matches
             if stored_provider != provider:
+                print(f"OAuth state validation failed: Provider mismatch. Expected '{provider}', got '{stored_provider}'")
                 return False
             
             # Token is valid, clean it up (one-time use)
@@ -302,6 +331,7 @@ class OAuthService:
                 DELETE FROM oauth_state_tokens WHERE state_token = ?
             """, [state])
             
+            print(f"OAuth state validation successful for provider '{provider}'")
             return True
         except Exception as e:
             print(f"Error validating OAuth state token: {e}")

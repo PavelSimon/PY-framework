@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """
-Development server for PY-Framework with hot reloading
-Based on dev_no_reload.py but with reloading enabled
+Development server for PY-Framework with NO reloading
 """
 
 import sys
@@ -27,16 +26,16 @@ from src.framework.routes.audit_routes import create_audit_routes
 from src.framework.audit import get_audit_service
 from src.framework.performance_config import init_performance
 from src.framework.database.optimized_database import OptimizedDatabase
+from src.framework.config import Settings
 
-def create_app():
-    """Create and configure the FastHTML application"""
+def create_simple_app():
     settings = Settings(debug=True)
     
-    # Create FastHTML app with development settings
+    # Create FastHTML app with NO reloading
     app = FastHTML(
-        debug=True,     # Enable debug mode
-        live=True,      # Enable live reload for HTML/CSS changes
-        reload=False,   # Disable FastHTML's own reload (uvicorn will handle it)
+        debug=False,  # Turn off debug to prevent reloader
+        live=False,   # Turn off live reload
+        reload=False, # Turn off reload
         hdrs=[
             Meta(charset="utf-8"),
             Meta(name="viewport", content="width=device-width, initial-scale=1"),
@@ -95,33 +94,26 @@ def create_app():
     
     return app
 
-# Create app instance at module level for uvicorn import
-app = create_app()
-
 if __name__ == "__main__":
     print("\n" + "="*50)
-    print("PY-Framework Development Server (With Hot Reload)")
+    print("PY-Framework Development Server (No Reload)")
     print("="*50)
     print("Server: http://localhost:8000")
     print("Admin login: admin@admin.com / AdminPass123!")
-    print("Pavel admin login: Pavel@pavel-simon.com / <your_password>")
     print("Audit dashboard: http://localhost:8000/admin/audit")
-    print("Hot reloading: ENABLED")
     print("Press Ctrl+C to stop")
-    print("="*50)
-    print("Watching: src/ directory for changes")
     print("="*50 + "\n")
     
-    # Use uvicorn with hot reloading enabled via import string
+    app = create_simple_app()
+    
+    # Use uvicorn without any reloading
     import uvicorn
     uvicorn.run(
-        "dev:app",                  # Import string - required for reload
+        app, 
         host="localhost", 
         port=8000, 
-        reload=True,                # Enable hot reloading
-        reload_dirs=["src"],        # Only watch src directory
-        reload_excludes=["*.db", "*.log"],  # Exclude database and log files
+        reload=False,      # No file watching
         access_log=True,
         use_colors=True,
-        log_level="info"
+        workers=1          # Single worker to prevent multiple processes
     )

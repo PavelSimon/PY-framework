@@ -54,7 +54,7 @@ class AuditService:
             # Create sequence for audit events
             self.db.conn.execute("CREATE SEQUENCE IF NOT EXISTS audit_event_id_seq START 1;")
             
-            # Create audit_events table
+            # Create audit_events table (no foreign key to allow user deletion)
             self.db.conn.execute("""
                 CREATE TABLE IF NOT EXISTS audit_events (
                     id INTEGER PRIMARY KEY DEFAULT nextval('audit_event_id_seq'),
@@ -68,6 +68,14 @@ class AuditService:
                     timestamp TIMESTAMP NOT NULL
                 )
             """)
+            
+            # Migration: Drop foreign key constraint if it exists (for user deletion support)
+            try:
+                # Try to drop the foreign key constraint - this will fail silently if it doesn't exist
+                self.db.conn.execute("ALTER TABLE audit_events DROP CONSTRAINT IF EXISTS audit_events_user_id_fkey")
+            except Exception:
+                # Ignore errors - constraint might not exist
+                pass
             
             # Create indexes for performance
             self.db.conn.execute("""
