@@ -149,9 +149,9 @@ sessions (
 - [x] Email service integration
 - [x] User registration with email verification
 - [x] Login system with session management
-- [ ] Password reset functionality
+- [x] Password reset functionality
 - [x] Basic HTML templates and forms
-- [ ] CSRF protection middleware
+- [x] CSRF protection middleware
 
 ### Phase 3: OAuth Integration
 - [ ] Google OAuth implementation
@@ -348,7 +348,7 @@ The framework implements a clean, modular route architecture for better maintain
 - `GET /auth/github` - GitHub OAuth initiation
 - `GET /auth/github/callback` - GitHub OAuth callback
 
-### Planned User Management (Future Implementation)
+### User Management Routes (`src/framework/routes/main.py`)
 - `POST /profile` - Update user profile
 - `GET /profile/change-password` - Change password page
 - `POST /profile/change-password` - Change password processing
@@ -436,12 +436,37 @@ CMD ["python", "app.py"]
    - Session validation and automatic cleanup
    - Comprehensive test coverage (11/11 tests passing)
 
-4. **Database Schema** ✅ - Production-ready database with proper indexing
+4. **Password Reset** ✅ - Secure password reset functionality
+   - Forgot password form with email-based reset
+   - Time-limited reset tokens (1 hour expiry)
+   - Secure password validation and updating
+   - Session invalidation after password reset
+
+5. **Password Change** ✅ - Secure password change functionality
+   - Current password verification required
+   - New password validation with strength requirements
+   - Prevention of reusing current password
+   - Session invalidation of other sessions for security
+
+6. **CSRF Protection** ✅ - Cross-Site Request Forgery prevention
+   - HMAC-signed tokens with session binding
+   - Automatic token generation and validation
+   - Integration across all forms and POST routes
+   - Comprehensive test coverage (14/14 tests passing)
+
+7. **Enhanced Security** ✅ - Production-grade security middleware
+   - Rate limiting with configurable limits
+   - Comprehensive security headers (HSTS, CSP, etc.)
+   - IP-based request tracking and protection
+   - Security event logging and reporting
+   - Comprehensive test coverage (25/25 tests passing)
+
+8. **Database Schema** ✅ - Production-ready database with proper indexing
    - Auto-incrementing sequences for all tables
    - Proper foreign key relationships
    - Optimized indexes for performance
 
-5. **Navigation Layout** ✅ - Professional navigation system
+9. **Navigation Layout** ✅ - Professional navigation system
    - Top navigation bar with favicon and main menu ("1. stránka")
    - Persona icon with dropdown (profile edit, logout)
    - Left sidebar for app-specific submenus (configurable)
@@ -449,17 +474,19 @@ CMD ["python", "app.py"]
    - Consistent layout components and utilities
 
 ### 🔄 NEXT DEVELOPMENT STEPS
-1. **CSRF Protection** - Add comprehensive CSRF token validation
-2. **Password Reset** - Complete password reset functionality
-3. **OAuth Integration** - Google and GitHub OAuth providers
-4. **Advanced Security** - Enhanced security headers and middleware
-5. **Production Deploy** - Docker, monitoring, and deployment guides
+1. **OAuth Integration** - Google and GitHub OAuth providers
+2. **Two-Factor Authentication** - Enhanced account security
+3. **Admin Dashboard** - User management and system monitoring
+4. **Production Deploy** - Docker, monitoring, and deployment guides
+5. **Performance Optimization** - Caching and database optimization
 
 ### 📊 TESTING STATUS
-- **Total Tests**: 29/29 passing ✅
+- **Total Tests**: 68/68 passing ✅
 - **Email Service**: 11/11 tests ✅
 - **Registration**: 7/7 tests ✅  
 - **Login System**: 11/11 tests ✅
+- **CSRF Protection**: 14/14 tests ✅
+- **Security Middleware**: 25/25 tests ✅
 - **Navigation Layout**: Fully implemented and tested ✅
 - **Code Coverage**: Comprehensive test coverage for all core features
 

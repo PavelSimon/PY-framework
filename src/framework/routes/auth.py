@@ -490,3 +490,281 @@ def create_auth_routes(app, db, auth_service, email_service=None, csrf_protectio
                 page_title="Resend Failed",
                 page_subtitle="An error occurred"
             ))
+    
+    @app.get("/auth/forgot-password")
+    def forgot_password_page(request):
+        # Create form with CSRF token if protection is enabled
+        form_elements = [
+            Div(
+                Label("Email:", fr="email"),
+                Input(type="email", id="email", name="email", required=True, placeholder="your-email@example.com"),
+                Small("Enter the email address associated with your account"),
+                cls="form-group"
+            )
+        ]
+        
+        # Add CSRF token if protection is enabled
+        if csrf_protection:
+            session_id = request.cookies.get('session_id')
+            form_elements.insert(0, csrf_protection.create_csrf_input(session_id))
+        
+        form_elements.append(Button("Send Reset Link", type="submit", cls="btn btn-primary"))
+        
+        content = Div(
+            P("Forgot your password? No problem. Enter your email address and we'll send you a reset link."),
+            Form(
+                *form_elements,
+                action="/auth/forgot-password",
+                method="post",
+                cls="form"
+            ),
+            P(A("Back to Login", href="/auth/login")),
+            P(A("Don't have an account? Register", href="/auth/register"))
+        )
+        return Titled("Forgot Password", create_auth_layout(
+            content,
+            page_title="Forgot Password",
+            page_subtitle="Reset your account password"
+        ))
+    
+    @app.post("/auth/forgot-password")
+    def send_password_reset(request, email: str, csrf_token: str = None):
+        try:
+            # Validate CSRF token if protection is enabled
+            if csrf_protection:
+                session_id = request.cookies.get('session_id')
+                if not csrf_protection.validate_token(csrf_token, session_id):
+                    content = Div(
+                        create_error_message("Invalid security token. Please try again."),
+                        P(A("Back to Reset", href="/auth/forgot-password", cls="btn btn-primary"))
+                    )
+                    return Titled("Security Error", create_auth_layout(
+                        content,
+                        page_title="Security Error",
+                        page_subtitle="Invalid security token"
+                    ))
+            
+            # Check if user exists
+            user = db.get_user_by_email(email)
+            
+            # Always show success message to prevent email enumeration
+            success_content = Div(
+                create_success_message("If an account exists with this email, a password reset link has been sent."),
+                P("Please check your email and spam folder."),
+                P("The reset link will expire in 1 hour."),
+                P(A("Back to Login", href="/auth/login", cls="btn btn-primary"))
+            )
+            
+            # Only actually send email if user exists and email service is configured
+            if user and email_service:
+                try:
+                    # Generate password reset token
+                    token = email_service.generate_password_reset_token(db, user['id'])
+                    
+                    # Send password reset email
+                    email_sent = email_service.send_password_reset_email(
+                        email, token, user['first_name'] or email.split('@')[0]
+                    )
+                    
+                    if not email_sent:
+                        print(f"Failed to send password reset email to {email}")
+                        
+                except Exception as e:
+                    print(f"Password reset email error: {e}")
+            
+            return Titled("Reset Link Sent", create_auth_layout(
+                success_content,
+                page_title="Reset Link Sent! 📧",
+                page_subtitle="Check your email inbox"
+            ))
+            
+        except Exception as e:
+            content = Div(
+                create_error_message("Unable to process password reset request. Please try again."),
+                P(A("Try again", href="/auth/forgot-password", cls="btn btn-primary"))
+            )
+            return Titled("Reset Failed", create_auth_layout(
+                content,
+                page_title="Reset Failed",
+                page_subtitle="An error occurred"
+            ))
+    
+    @app.get("/auth/reset-password/{token}")
+    def reset_password_page(token: str):
+        if not email_service:
+            content = Div(
+                create_error_message("Password reset is not configured."),
+                P(A("Back to Login", href="/auth/login", cls="btn btn-primary"))
+            )
+            return Titled("Reset Not Available", create_auth_layout(
+                content,
+                page_title="Password Reset Not Available",
+                page_subtitle="Service not configured"
+            ))
+        
+        # Verify the reset token
+        success, user_id, message = email_service.verify_password_reset_token(db, token)
+        
+        if not success:
+            content = Div(
+                create_error_message(message),
+                P("The reset link may be expired or invalid."),
+                P(A("Request New Reset Link", href="/auth/forgot-password", cls="btn btn-primary")),
+                P(A("Back to Login", href="/auth/login", cls="btn btn-secondary"))
+            )
+            return Titled("Invalid Reset Link", create_auth_layout(
+                content,
+                page_title="Invalid Reset Link",
+                page_subtitle="Unable to reset password"
+            ))
+        
+        # Create password reset form with CSRF token
+        form_elements = [
+            Input(type="hidden", name="token", value=token),
+            Div(
+                Label("New Password:", fr="password"),
+                Input(type="password", id="password", name="password", required=True),
+                Small("Minimum 8 characters with uppercase, lowercase, number, and special character"),
+                cls="form-group"
+            ),
+            Div(
+                Label("Confirm Password:", fr="confirm_password"),
+                Input(type="password", id="confirm_password", name="confirm_password", required=True),
+                cls="form-group"
+            )
+        ]
+        
+        # Add CSRF token if protection is enabled
+        if csrf_protection:
+            form_elements.insert(1, csrf_protection.create_csrf_input())
+        
+        form_elements.append(Button("Reset Password", type="submit", cls="btn btn-primary"))
+        
+        content = Div(
+            P("Enter your new password below. Make sure it's strong and secure."),
+            Form(
+                *form_elements,
+                action="/auth/reset-password",
+                method="post",
+                cls="form"
+            )
+        )
+        return Titled("Reset Password", create_auth_layout(
+            content,
+            page_title="Reset Password",
+            page_subtitle="Choose a new secure password"
+        ))
+    
+    @app.post("/auth/reset-password")
+    def process_password_reset(request, token: str, password: str, confirm_password: str, csrf_token: str = None):
+        try:
+            # Validate CSRF token if protection is enabled
+            if csrf_protection:
+                if not csrf_protection.validate_token(csrf_token):
+                    content = Div(
+                        create_error_message("Invalid security token. Please try again."),
+                        P(A("Back to Reset", href=f"/auth/reset-password/{token}", cls="btn btn-primary"))
+                    )
+                    return Titled("Security Error", create_auth_layout(
+                        content,
+                        page_title="Security Error",
+                        page_subtitle="Invalid security token"
+                    ))
+            
+            # Verify passwords match
+            if password != confirm_password:
+                content = Div(
+                    create_error_message("Passwords do not match. Please try again."),
+                    P(A("Back to Reset", href=f"/auth/reset-password/{token}", cls="btn btn-primary"))
+                )
+                return Titled("Password Mismatch", create_auth_layout(
+                    content,
+                    page_title="Password Mismatch",
+                    page_subtitle="Passwords must match"
+                ))
+            
+            # Verify the reset token is still valid
+            if not email_service:
+                content = Div(
+                    create_error_message("Password reset service is not available."),
+                    P(A("Back to Login", href="/auth/login", cls="btn btn-primary"))
+                )
+                return Titled("Service Unavailable", create_auth_layout(
+                    content,
+                    page_title="Service Unavailable",
+                    page_subtitle="Password reset not configured"
+                ))
+            
+            success, user_id, message = email_service.verify_password_reset_token(db, token)
+            
+            if not success:
+                content = Div(
+                    create_error_message(message),
+                    P("The reset token may have expired or been used already."),
+                    P(A("Request New Reset Link", href="/auth/forgot-password", cls="btn btn-primary"))
+                )
+                return Titled("Invalid Token", create_auth_layout(
+                    content,
+                    page_title="Invalid Reset Token",
+                    page_subtitle="Unable to reset password"
+                ))
+            
+            # Validate password requirements
+            from ..auth import UserRegistration
+            try:
+                # Use the registration validation to check password
+                temp_registration = UserRegistration(
+                    email="temp@example.com",  # Dummy email for validation
+                    password=password
+                )
+            except ValueError as ve:
+                content = Div(
+                    create_error_message(f"Password validation failed: {str(ve)}"),
+                    P(A("Back to Reset", href=f"/auth/reset-password/{token}", cls="btn btn-primary"))
+                )
+                return Titled("Invalid Password", create_auth_layout(
+                    content,
+                    page_title="Invalid Password",
+                    page_subtitle="Password does not meet requirements"
+                ))
+            
+            # Update user password
+            password_hash = auth_service.hash_password(password)
+            db.conn.execute("""
+                UPDATE users 
+                SET password_hash = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            """, [password_hash, user_id])
+            
+            # Mark reset token as used
+            email_service.mark_password_reset_token_used(db, token)
+            
+            # Invalidate all user sessions for security
+            db.conn.execute("""
+                UPDATE sessions 
+                SET is_active = FALSE 
+                WHERE user_id = ?
+            """, [user_id])
+            
+            content = Div(
+                create_success_message("Your password has been successfully reset."),
+                P("All existing sessions have been logged out for security."),
+                P("You can now log in with your new password."),
+                P(A("Login", href="/auth/login", cls="btn btn-primary"))
+            )
+            return Titled("Password Reset Successful", create_auth_layout(
+                content,
+                page_title="Password Reset Successful! ✅",
+                page_subtitle="Your password has been updated"
+            ))
+            
+        except Exception as e:
+            content = Div(
+                create_error_message(f"An error occurred while resetting your password: {str(e)}"),
+                P(A("Try again", href=f"/auth/reset-password/{token}", cls="btn btn-primary"))
+            )
+            return Titled("Reset Failed", create_auth_layout(
+                content,
+                page_title="Reset Failed",
+                page_subtitle="An error occurred"
+            ))

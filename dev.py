@@ -26,6 +26,7 @@ with redirect_stderr(stderr_buffer):
     from src.framework.auth import AuthenticationService
     from src.framework.email import EmailService
     from src.framework.csrf import CSRFProtection, add_csrf_middleware
+    from src.framework.security import add_security_middleware, create_security_config
     from src.framework.routes import create_auth_routes, create_main_routes, create_dev_routes
 
 def create_dev_app():
@@ -52,6 +53,10 @@ def create_dev_app():
     
     # Add CSRF middleware
     add_csrf_middleware(app, csrf_protection)
+    
+    # Add enhanced security middleware (development settings)
+    security_config = create_security_config(is_production=False)
+    add_security_middleware(app, security_config)
     
     # Register route modules
     create_auth_routes(app, db, auth_service, email_service, csrf_protection)

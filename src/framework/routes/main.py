@@ -3,7 +3,7 @@ Main application route handlers for PY-Framework
 """
 
 from fasthtml.common import *
-from ..layout import create_app_layout, create_auth_layout, create_page_title, create_success_message
+from ..layout import create_app_layout, create_auth_layout, create_page_title, create_success_message, create_error_message
 from ..session import get_current_user
 
 
@@ -253,6 +253,183 @@ def create_main_routes(app, db=None, auth_service=None, is_development=False, cs
                 user=user,
                 page_title="Update Failed",
                 page_subtitle="An error occurred while updating your profile"
+            ))
+    
+    @app.get("/profile/change-password")
+    def change_password_page(request):
+        # Change password page
+        user = get_current_user(request, db, auth_service)
+        
+        if not user:
+            return RedirectResponse("/auth/login", status_code=302)
+        
+        # Create form with CSRF token if protection is enabled
+        form_elements = [
+            Div(
+                Label("Current Password:", fr="current_password"),
+                Input(type="password", id="current_password", name="current_password", required=True),
+                cls="form-group"
+            ),
+            Div(
+                Label("New Password:", fr="new_password"),
+                Input(type="password", id="new_password", name="new_password", required=True),
+                Small("Minimum 8 characters with uppercase, lowercase, number, and special character"),
+                cls="form-group"
+            ),
+            Div(
+                Label("Confirm New Password:", fr="confirm_password"),
+                Input(type="password", id="confirm_password", name="confirm_password", required=True),
+                cls="form-group"
+            )
+        ]
+        
+        # Add CSRF token if protection is enabled
+        if csrf_protection:
+            session_id = request.cookies.get('session_id')
+            form_elements.insert(0, csrf_protection.create_csrf_input(session_id))
+        
+        form_elements.append(Button("Change Password", type="submit", cls="btn btn-primary"))
+        
+        content = Div(
+            P("Enter your current password and choose a new secure password."),
+            Form(
+                *form_elements,
+                action="/profile/change-password",
+                method="post",
+                cls="form"
+            ),
+            P(A("Back to Profile", href="/profile", cls="btn btn-secondary"))
+        )
+        return Titled("Change Password", create_app_layout(
+            content, 
+            user=user, 
+            current_page="/profile",
+            page_title="Change Password",
+            page_subtitle="Update your account password"
+        ))
+    
+    @app.post("/profile/change-password")
+    def process_change_password(request, current_password: str, new_password: str, confirm_password: str, csrf_token: str = None):
+        # Get current user from session
+        user = get_current_user(request, db, auth_service)
+        
+        if not user:
+            return RedirectResponse("/auth/login", status_code=302)
+        
+        try:
+            # Validate CSRF token if protection is enabled
+            if csrf_protection:
+                session_id = request.cookies.get('session_id')
+                if not csrf_protection.validate_token(csrf_token, session_id):
+                    content = Div(
+                        create_error_message("Invalid security token. Please try again."),
+                        P(A("Back to Change Password", href="/profile/change-password", cls="btn btn-primary"))
+                    )
+                    return Titled("Security Error", create_app_layout(
+                        content, 
+                        user=user,
+                        page_title="Security Error",
+                        page_subtitle="Invalid security token"
+                    ))
+            
+            # Verify new passwords match
+            if new_password != confirm_password:
+                content = Div(
+                    create_error_message("New passwords do not match. Please try again."),
+                    P(A("Back to Change Password", href="/profile/change-password", cls="btn btn-primary"))
+                )
+                return Titled("Password Mismatch", create_app_layout(
+                    content, 
+                    user=user,
+                    page_title="Password Mismatch",
+                    page_subtitle="Passwords must match"
+                ))
+            
+            # Verify current password
+            if not auth_service.verify_password(current_password, user['password_hash']):
+                content = Div(
+                    create_error_message("Current password is incorrect. Please try again."),
+                    P(A("Back to Change Password", href="/profile/change-password", cls="btn btn-primary"))
+                )
+                return Titled("Incorrect Password", create_app_layout(
+                    content, 
+                    user=user,
+                    page_title="Incorrect Password",
+                    page_subtitle="Current password verification failed"
+                ))
+            
+            # Validate new password requirements
+            from ..auth import UserRegistration
+            try:
+                # Use the registration validation to check password
+                temp_registration = UserRegistration(
+                    email="temp@example.com",  # Dummy email for validation
+                    password=new_password
+                )
+            except ValueError as ve:
+                content = Div(
+                    create_error_message(f"New password validation failed: {str(ve)}"),
+                    P(A("Back to Change Password", href="/profile/change-password", cls="btn btn-primary"))
+                )
+                return Titled("Invalid Password", create_app_layout(
+                    content, 
+                    user=user,
+                    page_title="Invalid Password",
+                    page_subtitle="Password does not meet requirements"
+                ))
+            
+            # Check if new password is different from current
+            if auth_service.verify_password(new_password, user['password_hash']):
+                content = Div(
+                    create_error_message("New password must be different from your current password."),
+                    P(A("Back to Change Password", href="/profile/change-password", cls="btn btn-primary"))
+                )
+                return Titled("Same Password", create_app_layout(
+                    content, 
+                    user=user,
+                    page_title="Same Password",
+                    page_subtitle="New password must be different"
+                ))
+            
+            # Update user password
+            new_password_hash = auth_service.hash_password(new_password)
+            db.conn.execute("""
+                UPDATE users 
+                SET password_hash = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            """, [new_password_hash, user['id']])
+            
+            # Invalidate all other user sessions for security (except current)
+            current_session_id = request.cookies.get('session_id')
+            db.conn.execute("""
+                UPDATE sessions 
+                SET is_active = FALSE 
+                WHERE user_id = ? AND id != ?
+            """, [user['id'], current_session_id])
+            
+            content = Div(
+                create_success_message("Your password has been successfully changed."),
+                P("All other sessions have been logged out for security."),
+                P(A("Back to Profile", href="/profile", cls="btn btn-primary")),
+                P(A("Go to Dashboard", href="/dashboard", cls="btn btn-secondary"))
+            )
+            return Titled("Password Changed", create_app_layout(
+                content, 
+                user=user,
+                page_title="Password Changed! ✅",
+                page_subtitle="Your password has been updated"
+            ))
+            
+        except Exception as e:
+            content = Div(
+                create_error_message(f"Failed to change password: {str(e)}"),
+                P(A("Back to Change Password", href="/profile/change-password", cls="btn btn-primary"))
+            )
+            return Titled("Change Failed", create_app_layout(
+                content, 
+                user=user,
+                page_title="Change Failed",
+                page_subtitle="An error occurred while changing your password"
             ))
     
     @app.get("/health")

@@ -25,6 +25,7 @@ with redirect_stderr(stderr_buffer):
     from src.framework.auth import AuthenticationService
     from src.framework.email import EmailService
     from src.framework.csrf import CSRFProtection, add_csrf_middleware
+    from src.framework.security import add_security_middleware, create_security_config
     from src.framework.routes import create_auth_routes, create_main_routes
 
 def create_production_app():
@@ -51,23 +52,9 @@ def create_production_app():
     # Add CSRF middleware
     add_csrf_middleware(app, csrf_protection)
     
-    # Security middleware
-    @app.middleware("http")
-    async def security_headers(request, call_next):
-        response = await call_next(request)
-        response.headers["X-Content-Type-Options"] = "nosniff"
-        response.headers["X-Frame-Options"] = "DENY"
-        response.headers["X-XSS-Protection"] = "1; mode=block"
-        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
-        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-        response.headers["Content-Security-Policy"] = (
-            "default-src 'self'; "
-            "script-src 'self' 'unsafe-inline'; "
-            "style-src 'self' 'unsafe-inline'; "
-            "img-src 'self' data: https:; "
-            "font-src 'self'"
-        )
-        return response
+    # Add enhanced security middleware
+    security_config = create_security_config(is_production=True)
+    add_security_middleware(app, security_config)
     
     # Register route modules
     create_auth_routes(app, db, auth_service, email_service, csrf_protection)
