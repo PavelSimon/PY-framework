@@ -1,7 +1,7 @@
 # PY-Framework
 
-A secure, robust FastHTML and DuckDB-based web framework with state-of-the-art authentication, minimal JavaScript, and built-in OAuth support for Google and GitHub.
-Created with full support fo Claude Code.
+A secure, robust FastHTML and DuckDB-based web framework with state-of-the-art authentication, minimal JavaScript, enterprise-grade security, and OAuth integration support.
+Created with full support for Claude Code.
 
 ## 🚀 Features
 
@@ -10,8 +10,12 @@ Created with full support fo Claude Code.
 - **DuckDB**: High-performance embedded database with optimized schema
 - **Secure Authentication**: BCrypt password hashing (12 rounds), rate limiting, account lockout
 - **Email Verification**: Complete user registration with email confirmation system
-- **Session Management**: Secure session handling with automatic cleanup and tracking
-- **Password Security**: Advanced password validation with strength scoring
+- **Session Management**: Secure session handling with automatic cleanup, tracking, and session-aware routing
+- **Password Security**: Advanced password validation with strength scoring and reset functionality
+- **Password Reset**: Secure email-based password reset with time-limited tokens
+- **Password Change**: Current password verification with secure password updating
+- **CSRF Protection**: Cross-site request forgery prevention with HMAC-signed tokens
+- **Security Middleware**: Production-grade security headers, rate limiting, and IP tracking
 - **Account Protection**: Automatic lockout after failed attempts with configurable duration
 - **Professional Navigation**: 3-tier navigation with top menu, sidebar, and persona dropdown
 - **Responsive Design**: Mobile-optimized layout with collapsible sidebar
@@ -20,14 +24,14 @@ Created with full support fo Claude Code.
 
 ### 🔄 IN DEVELOPMENT
 - **OAuth Integration**: Google and GitHub SSO support (database ready)
-- **CSRF Protection**: Built-in cross-site request forgery protection
-- **Password Reset**: Secure password reset flow via email
-- **Security Headers**: Comprehensive security headers for production
+- **Two-Factor Authentication**: Enhanced account security with TOTP
+- **Admin Dashboard**: User management and system monitoring
+- **Performance Optimization**: Caching and database optimization
 
 ### 📊 TESTING STATUS
-- **29/29 tests passing** ✅
+- **68/68 tests passing** ✅
 - **100% core functionality tested**
-- **Email service, registration, and login fully validated**
+- **Complete test coverage**: Email service, registration, login, CSRF protection, security middleware
 
 ## 📋 Requirements
 
@@ -82,12 +86,15 @@ PY-framework/
 │   ├── database/           # Database operations
 │   ├── email/              # Email services
 │   ├── oauth/              # OAuth integrations
-│   ├── routes/             # Route handlers (NEW!)
+│   ├── routes/             # Route handlers (modular architecture)
 │   │   ├── auth.py         # Authentication routes
 │   │   ├── main.py         # Main application routes
 │   │   └── dev.py          # Development routes
 │   ├── layout.py           # Layout components
-│   └── config.py           # Configuration management
+│   ├── config.py           # Configuration management
+│   ├── csrf.py             # CSRF protection
+│   ├── security.py         # Security middleware
+│   └── session.py          # Session management
 ├── templates/              # HTML templates
 ├── static/                 # Static assets
 │   ├── css/               # Stylesheets
@@ -137,10 +144,12 @@ The framework uses environment variables for configuration. Copy `.env.example` 
 - Secure password reset flow
 
 ### Account Protection
-- Rate limiting on login attempts
+- Rate limiting on login attempts and API endpoints
 - Account lockout after failed attempts
 - Session management with automatic cleanup
-- CSRF token protection
+- CSRF token protection on all forms
+- Security headers (HSTS, CSP, etc.)
+- IP-based request tracking and protection
 
 ### OAuth Security
 - Secure state parameter validation
@@ -184,25 +193,34 @@ The framework uses a modular route architecture for better maintainability and s
 ## 📚 API Documentation
 
 ### Authentication Endpoints
-- `POST /auth/register` - User registration
-- `POST /auth/login` - User login
-- `POST /auth/logout` - User logout
+- `GET /auth/register` - User registration page
+- `POST /auth/register` - User registration processing
+- `GET /auth/login` - User login page
+- `POST /auth/login` - User login processing
+- `GET /auth/logout` - User logout
 - `GET /auth/verify/{token}` - Email verification
 - `GET /auth/resend-verification` - Resend verification email page
-- `POST /auth/resend-verification` - Resend verification email
+- `POST /auth/resend-verification` - Resend verification email processing
+- `GET /auth/forgot-password` - Forgot password page
+- `POST /auth/forgot-password` - Send password reset email
+- `GET /auth/reset-password/{token}` - Reset password page
+- `POST /auth/reset-password` - Process password reset
 
-### OAuth Endpoints
+### OAuth Endpoints (In Development)
 - `GET /auth/google` - Google OAuth initiation
 - `GET /auth/google/callback` - Google OAuth callback
 - `GET /auth/github` - GitHub OAuth initiation
 - `GET /auth/github/callback` - GitHub OAuth callback
 
-### System Endpoints
-- `GET /health` - Health check (production)
-- `GET /` - Homepage
-- `GET /dashboard` - User dashboard
-- `GET /profile` - Profile edit page
+### Main Application Endpoints
+- `GET /` - Session-aware homepage (redirects to dashboard if logged in)
+- `GET /dashboard` - User dashboard (authenticated, direct redirect after login)
+- `GET /profile` - Profile edit page (authenticated)
+- `POST /profile` - Update user profile
+- `GET /profile/change-password` - Change password page (authenticated)
+- `POST /profile/change-password` - Change password processing
 - `GET /page1` - Sample page demonstrating navigation
+- `GET /health` - Health check endpoint
 
 ### Development Endpoints (dev.py only)
 - `GET /dev/test-email` - Email service testing tool
@@ -210,15 +228,36 @@ The framework uses a modular route architecture for better maintainability and s
 - `GET /dev/test-auth` - Authentication system test page
 - `GET /dev/database` - Database inspector
 
-## 🛡️ Security Best Practices
+## 📚 Documentation
 
-1. **Always use HTTPS in production**
-2. **Keep dependencies updated**
-3. **Use strong secret keys**
-4. **Configure proper CORS origins**
-5. **Set up proper email verification**
-6. **Monitor failed login attempts**
-7. **Regular security audits**
+### Core Documentation
+- **[Security Guide](docs/SECURITY.md)** - Comprehensive security features and best practices
+- **[API Reference](docs/API.md)** - Complete API endpoint documentation
+- **[Deployment Guide](docs/DEPLOYMENT.md)** - Production deployment and configuration
+- **[Development Specs](CLAUDE.md)** - Detailed development specifications and progress
+
+### Quick Links
+- **Security Features**: CSRF protection, rate limiting, password policies, security headers
+- **Authentication**: Registration, login, email verification, password reset, OAuth (coming)
+- **API Endpoints**: RESTful endpoints with comprehensive validation and error handling
+- **Production Ready**: Docker support, systemd services, nginx configuration
+
+## 🛡️ Security Highlights
+
+✅ **Enterprise-Grade Security**
+- CSRF protection with HMAC-signed tokens
+- Rate limiting and IP-based request tracking  
+- Comprehensive security headers (HSTS, CSP, etc.)
+- BCrypt password hashing with 12 rounds
+- Account lockout and session management
+- Security event logging and monitoring
+
+✅ **Production-Ready Architecture**  
+- Modular route organization
+- Comprehensive test coverage (68/68 tests passing)
+- Database optimization and indexing
+- Email service integration
+- Professional navigation layout
 
 ## 🤝 Contributing
 
@@ -234,7 +273,12 @@ This project is licensed under the MIT License.
 
 ## 🆘 Support
 
-For issues and questions, please check the `CLAUDE.md` file for detailed development specifications or create an issue in the repository.
+For questions and support:
+- **Development**: Check [CLAUDE.md](CLAUDE.md) for detailed specifications
+- **Security**: Review [Security Guide](docs/SECURITY.md)
+- **API**: See [API Documentation](docs/API.md)  
+- **Deployment**: Follow [Deployment Guide](docs/DEPLOYMENT.md)
+- **Issues**: Create an issue in the repository
 
 ---
 

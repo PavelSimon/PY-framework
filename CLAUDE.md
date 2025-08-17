@@ -434,6 +434,8 @@ CMD ["python", "app.py"]
    - Account lockout after 5 failed attempts (configurable)
    - Session creation with IP/user-agent tracking
    - Session validation and automatic cleanup
+   - Direct redirect to dashboard after login
+   - Session-aware homepage (shows dashboard if logged in, login if not)
    - Comprehensive test coverage (11/11 tests passing)
 
 4. **Password Reset** ✅ - Secure password reset functionality
@@ -471,6 +473,7 @@ CMD ["python", "app.py"]
    - Persona icon with dropdown (profile edit, logout)
    - Left sidebar for app-specific submenus (configurable)
    - Responsive design for mobile devices
+   - Session-aware routing and navigation
    - Consistent layout components and utilities
 
 ### 🔄 NEXT DEVELOPMENT STEPS

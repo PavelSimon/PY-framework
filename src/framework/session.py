@@ -16,18 +16,28 @@ def store_session(session_id: str, user_id: int):
     _active_sessions[session_id] = user_id
 
 
+def clear_session(session_id: str):
+    """Clear session from temporary store"""
+    if session_id in _active_sessions:
+        del _active_sessions[session_id]
+
+
 def get_current_user(request, db, auth_service) -> Optional[Dict[str, Any]]:
     """Get current logged-in user from session"""
     try:
-        # For development, try to get session from cookie first
+        # Get session from cookie first
         session_id = request.cookies.get('session_id')
         
-        # If no cookie, check if there's an active session (demo mode)
+        # For development, if no cookie but we have active sessions, use the most recent one
+        # This is a simplified approach for development without proper cookie handling
         if not session_id and _active_sessions:
-            # Get the most recent session for demo purposes
-            session_id = list(_active_sessions.keys())[-1] if _active_sessions else None
+            session_id = list(_active_sessions.keys())[-1]
         
         if not session_id:
+            return None
+        
+        # Check if session exists in temporary store (development only)
+        if session_id not in _active_sessions:
             return None
         
         # Validate session and get user
@@ -40,8 +50,15 @@ def get_current_user(request, db, auth_service) -> Optional[Dict[str, Any]]:
 
 def create_session_response(content, session_id: str = None, clear_session: bool = False):
     """Create response with session cookie"""
-    # For now, return content directly - we'll implement proper cookie handling later
-    # The session is stored in the database and can be retrieved by session_id
+    if clear_session:
+        # Clear session from temporary store
+        if session_id:
+            clear_session(session_id)
+        # For development, we'll clear all sessions to ensure logout works
+        _active_sessions.clear()
+    
+    # For now, return content directly and rely on the in-memory session store
+    # This is a simplified approach for development
     return content
 
 

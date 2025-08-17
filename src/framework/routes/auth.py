@@ -6,7 +6,7 @@ from fasthtml.common import *
 from ..auth import UserRegistration
 from ..email import EmailService
 from ..layout import create_auth_layout, create_page_title, create_success_message, create_error_message, create_warning_message
-from ..session import create_session_response, store_session
+from ..session import create_session_response, store_session, clear_session
 from ..csrf import csrf_protect
 
 
@@ -300,17 +300,8 @@ def create_auth_routes(app, db, auth_service, email_service=None, csrf_protectio
             # Store session temporarily for development
             store_session(session_id, user['id'])
             
-            # Create response content
-            content = Div(
-                H1("Login Successful!"),
-                P(f"Welcome back, {user['first_name'] or user['email']}!", cls="alert alert-success"),
-                P(A("Go to Dashboard", href="/dashboard", cls="btn btn-primary")),
-                P(A("Logout", href="/auth/logout", cls="btn btn-secondary")),
-                cls="container"
-            )
-            
-            # Return response with session cookie
-            return create_session_response(content, session_id)
+            # Redirect directly to dashboard after successful login
+            return RedirectResponse("/dashboard", status_code=302)
             
         except Exception as e:
             return Div(
@@ -325,7 +316,10 @@ def create_auth_routes(app, db, auth_service, email_service=None, csrf_protectio
         # Get session ID and invalidate it
         session_id = request.cookies.get('session_id')
         if session_id:
+            # Invalidate session in database
             auth_service.logout_user(db, session_id)
+            # Clear session from temporary store
+            clear_session(session_id)
         
         # Create logout content
         content = Div(
@@ -336,7 +330,7 @@ def create_auth_routes(app, db, auth_service, email_service=None, csrf_protectio
         )
         
         # Return response with cleared session cookie
-        return create_session_response(content, clear_session=True)
+        return create_session_response(content, session_id=session_id, clear_session=True)
     
     @app.get("/auth/resend-verification")
     def resend_verification_page(request):
