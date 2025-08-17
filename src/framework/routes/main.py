@@ -531,6 +531,160 @@ def create_main_routes(app, db=None, auth_service=None, is_development=False, cs
             show_sidebar=False  # We'll use our own docs sidebar
         ))
     
+    @app.get("/users")
+    def users_page(request):
+        # Users management page - admin can see all users, regular users see only themselves
+        user = get_current_user(request, db, auth_service)
+        
+        if not user:
+            return RedirectResponse("/auth/login", status_code=302)
+        
+        # Check if user is admin
+        is_admin = user.get('role_id') == 0
+        
+        # Get users based on role
+        if is_admin:
+            # Admin can see all users
+            users = db.get_all_users_with_roles()
+            page_title = "User Management"
+            page_subtitle = "Manage all system users (Admin view)"
+        else:
+            # Regular users see only themselves
+            users = [user]  # Show only current user
+            page_title = "My Account"
+            page_subtitle = "Your account information"
+        
+        # Create user cards
+        user_cards = []
+        for u in users:
+            # Determine role styling
+            role_class = "admin-role" if u.get('role_id') == 0 else "user-role"
+            role_icon = "👑" if u.get('role_id') == 0 else "👤"
+            
+            # Create user card
+            user_card = Div(
+                Div(
+                    H4(f"{role_icon} {u.get('first_name', 'Unknown')} {u.get('last_name', '')}".strip()),
+                    P(f"📧 {u.get('email', 'No email')}"),
+                    P(f"🏷️ Role: {u.get('role_name', 'Unknown').title()}", cls=f"role-badge {role_class}"),
+                    P(f"✅ Verified: {'Yes' if u.get('is_verified') else 'No'}"),
+                    P(f"🔄 Status: {'Active' if u.get('is_active') else 'Inactive'}"),
+                    P(f"📅 Joined: {u.get('created_at').strftime('%B %d, %Y') if u.get('created_at') else 'Unknown'}"),
+                    P(f"🕐 Last Login: {u.get('last_login').strftime('%B %d, %Y at %H:%M') if u.get('last_login') else 'Never'}"),
+                    
+                    # Admin actions (only visible to admins and not for current user)
+                    Div(
+                        H5("Admin Actions"),
+                        Div(
+                            A("Edit Role", href=f"/users/{u.get('id')}/edit-role", cls="btn btn-outline btn-sm") if is_admin and u.get('id') != user.get('id') else None,
+                            A("View Sessions", href=f"/users/{u.get('id')}/sessions", cls="btn btn-outline btn-sm") if is_admin else None,
+                            A("Toggle Status", href=f"/users/{u.get('id')}/toggle", cls="btn btn-outline btn-sm") if is_admin and u.get('id') != user.get('id') else None,
+                            cls="button-group"
+                        ),
+                        cls="admin-actions"
+                    ) if is_admin and len(users) > 1 else None,
+                    
+                    # Self-management actions
+                    Div(
+                        H5("Account Actions"),
+                        Div(
+                            A("Edit Profile", href="/profile", cls="btn btn-primary btn-sm"),
+                            A("Change Password", href="/profile/change-password", cls="btn btn-secondary btn-sm"),
+                            A("View Settings", href="/settings", cls="btn btn-outline btn-sm"),
+                            cls="button-group"
+                        ),
+                        cls="self-actions"
+                    ) if u.get('id') == user.get('id') else None,
+                    
+                    cls="user-info"
+                ),
+                cls=f"user-card {role_class}" + (" current-user" if u.get('id') == user.get('id') else "")
+            )
+            user_cards.append(user_card)
+        
+        # Create main content
+        content = Div(
+            # Summary section (admin only)
+            Div(
+                H2("📊 User Summary"),
+                Div(
+                    Div(
+                        H4("Total Users"),
+                        P(f"{len(users)}", cls="stat-number"),
+                        cls="stat-card"
+                    ),
+                    Div(
+                        H4("Admin Users"),
+                        P(f"{len([u for u in users if u.get('role_id') == 0])}", cls="stat-number admin-stat"),
+                        cls="stat-card"
+                    ),
+                    Div(
+                        H4("Regular Users"),
+                        P(f"{len([u for u in users if u.get('role_id') == 1])}", cls="stat-number user-stat"),
+                        cls="stat-card"
+                    ),
+                    Div(
+                        H4("Verified Users"),
+                        P(f"{len([u for u in users if u.get('is_verified')])}", cls="stat-number verified-stat"),
+                        cls="stat-card"
+                    ),
+                    cls="stats-grid"
+                ),
+                cls="users-section"
+            ) if is_admin else None,
+            
+            # Users list section
+            Div(
+                H2("👥 Users" if is_admin else "👤 My Account"),
+                Div(
+                    *user_cards,
+                    cls="users-grid"
+                ),
+                cls="users-section"
+            ),
+            
+            # Admin tools section
+            Div(
+                H2("🛠️ Admin Tools"),
+                Div(
+                    Div(
+                        H4("User Management"),
+                        P("Manage user accounts, roles, and permissions."),
+                        Div(
+                            A("Create User", href="/users/create", cls="btn btn-primary"),
+                            A("Export Users", href="/users/export", cls="btn btn-outline"),
+                            A("Audit Log", href="/users/audit", cls="btn btn-secondary"),
+                            cls="button-group"
+                        ),
+                        cls="admin-tools-card"
+                    ),
+                    Div(
+                        H4("System Actions"),
+                        P("System-wide administration functions."),
+                        Div(
+                            A("View All Sessions", href="/admin/sessions", cls="btn btn-outline"),
+                            A("System Settings", href="/admin/settings", cls="btn btn-outline"),
+                            A("Security Log", href="/admin/security", cls="btn btn-secondary"),
+                            cls="button-group"
+                        ),
+                        cls="admin-tools-card"
+                    ),
+                    cls="admin-tools-grid"
+                ),
+                cls="users-section"
+            ) if is_admin else None,
+            
+            cls="users-container"
+        )
+        
+        return Titled("Users", create_app_layout(
+            content, 
+            user=user, 
+            current_page="/users",
+            page_title=page_title,
+            page_subtitle=page_subtitle
+        ))
+
     @app.get("/settings")
     def settings_page(request):
         # Settings page - comprehensive user preferences and configuration
@@ -710,6 +864,307 @@ def create_main_routes(app, db=None, auth_service=None, is_development=False, cs
             page_title="Settings",
             page_subtitle="Manage your account preferences and security settings"
         ))
+    
+    @app.get("/users/{user_id:int}/edit-role")
+    def edit_user_role_page(request, user_id: int):
+        # Admin-only: Edit user role page
+        user = get_current_user(request, db, auth_service)
+        
+        if not user or user.get('role_id') != 0:
+            return RedirectResponse("/", status_code=302)
+        
+        # Get target user
+        target_user = db.get_user_with_role(user_id)
+        if not target_user:
+            content = Div(
+                create_error_message("User not found."),
+                P(A("Back to Users", href="/users", cls="btn btn-primary"))
+            )
+            return Titled("User Not Found", create_app_layout(
+                content, 
+                user=user,
+                page_title="User Not Found",
+                page_subtitle="The specified user could not be found"
+            ))
+        
+        # Prevent admin from editing their own role
+        if target_user['id'] == user['id']:
+            content = Div(
+                create_error_message("You cannot edit your own role."),
+                P(A("Back to Users", href="/users", cls="btn btn-primary"))
+            )
+            return Titled("Cannot Edit Own Role", create_app_layout(
+                content, 
+                user=user,
+                page_title="Cannot Edit Own Role",
+                page_subtitle="Security restriction"
+            ))
+        
+        # Create role selection form
+        form_elements = [
+            Div(
+                H4(f"Editing role for: {target_user['first_name'] or 'Unknown'} {target_user['last_name'] or ''} ({target_user['email']})"),
+                cls="form-group"
+            ),
+            Div(
+                Label("Current Role:", fr="current_role"),
+                P(f"{target_user.get('role_name', 'Unknown').title()} (ID: {target_user.get('role_id')})", cls="current-role-display"),
+                cls="form-group"
+            ),
+            Div(
+                Label("New Role:", fr="role_id"),
+                Select(
+                    Option("Regular User", value="1", selected=target_user.get('role_id') == 1),
+                    Option("Administrator", value="0", selected=target_user.get('role_id') == 0),
+                    id="role_id", name="role_id", required=True
+                ),
+                Small("Administrators have full access to all system features"),
+                cls="form-group"
+            )
+        ]
+        
+        # Add CSRF token if protection is enabled
+        if csrf_protection:
+            session_id = request.cookies.get('session_id')
+            form_elements.insert(-1, csrf_protection.create_csrf_input(session_id))
+        
+        form_elements.extend([
+            Div(
+                Button("Update Role", type="submit", cls="btn btn-primary"),
+                A("Cancel", href="/users", cls="btn btn-secondary"),
+                cls="button-group"
+            )
+        ])
+        
+        content = Div(
+            P("⚠️ Changing user roles affects their access permissions. Please be careful."),
+            Form(
+                *form_elements,
+                action=f"/users/{user_id}/edit-role",
+                method="post",
+                cls="form"
+            )
+        )
+        return Titled("Edit User Role", create_app_layout(
+            content, 
+            user=user, 
+            current_page="/users",
+            page_title="Edit User Role",
+            page_subtitle="Manage user access permissions"
+        ))
+    
+    @app.post("/users/{user_id:int}/edit-role")
+    def update_user_role(request, user_id: int, role_id: int, csrf_token: str = None):
+        # Admin-only: Update user role
+        user = get_current_user(request, db, auth_service)
+        
+        if not user or user.get('role_id') != 0:
+            return RedirectResponse("/", status_code=302)
+        
+        # Get target user
+        target_user = db.get_user_with_role(user_id)
+        if not target_user:
+            return RedirectResponse("/users", status_code=302)
+        
+        # Prevent admin from editing their own role
+        if target_user['id'] == user['id']:
+            return RedirectResponse("/users", status_code=302)
+        
+        try:
+            # Validate CSRF token if protection is enabled
+            if csrf_protection:
+                session_id = request.cookies.get('session_id')
+                if not csrf_protection.validate_token(csrf_token, session_id):
+                    content = Div(
+                        create_error_message("Invalid security token. Please try again."),
+                        P(A("Back to Users", href="/users", cls="btn btn-primary"))
+                    )
+                    return Titled("Security Error", create_app_layout(
+                        content, 
+                        user=user,
+                        page_title="Security Error",
+                        page_subtitle="Invalid security token"
+                    ))
+            
+            # Validate role_id
+            if role_id not in [0, 1]:
+                content = Div(
+                    create_error_message("Invalid role selected."),
+                    P(A("Back to Edit Role", href=f"/users/{user_id}/edit-role", cls="btn btn-primary"))
+                )
+                return Titled("Invalid Role", create_app_layout(
+                    content, 
+                    user=user,
+                    page_title="Invalid Role",
+                    page_subtitle="Please select a valid role"
+                ))
+            
+            # Update user role
+            success = db.update_user_role(user_id, role_id)
+            
+            if success:
+                role_name = "Administrator" if role_id == 0 else "Regular User"
+                content = Div(
+                    create_success_message(f"User role updated to {role_name} successfully."),
+                    P(A("Back to Users", href="/users", cls="btn btn-primary")),
+                    P(A("Edit Another User", href="/users", cls="btn btn-secondary"))
+                )
+                return Titled("Role Updated", create_app_layout(
+                    content, 
+                    user=user,
+                    page_title="Role Updated! ✅",
+                    page_subtitle="User permissions have been changed"
+                ))
+            else:
+                content = Div(
+                    create_error_message("Failed to update user role. Please try again."),
+                    P(A("Back to Edit Role", href=f"/users/{user_id}/edit-role", cls="btn btn-primary"))
+                )
+                return Titled("Update Failed", create_app_layout(
+                    content, 
+                    user=user,
+                    page_title="Update Failed",
+                    page_subtitle="An error occurred while updating the role"
+                ))
+            
+        except Exception as e:
+            content = Div(
+                create_error_message(f"Failed to update role: {str(e)}"),
+                P(A("Back to Edit Role", href=f"/users/{user_id}/edit-role", cls="btn btn-primary"))
+            )
+            return Titled("Update Failed", create_app_layout(
+                content, 
+                user=user,
+                page_title="Update Failed",
+                page_subtitle="An error occurred while updating the role"
+            ))
+    
+    @app.get("/users/{user_id:int}/sessions")
+    def view_user_sessions(request, user_id: int):
+        # Admin-only: View user sessions
+        user = get_current_user(request, db, auth_service)
+        
+        if not user or user.get('role_id') != 0:
+            return RedirectResponse("/", status_code=302)
+        
+        # Get target user
+        target_user = db.get_user_with_role(user_id)
+        if not target_user:
+            return RedirectResponse("/users", status_code=302)
+        
+        # Get user's sessions
+        try:
+            cursor = db.conn.execute("""
+                SELECT id, created_at, ip_address, user_agent, is_active, expires_at
+                FROM sessions 
+                WHERE user_id = ?
+                ORDER BY created_at DESC
+                LIMIT 50
+            """, [user_id])
+            sessions = cursor.fetchall()
+        except Exception as e:
+            sessions = []
+        
+        # Create session cards
+        session_cards = []
+        for session in sessions:
+            status_class = "active-session" if session[4] else "inactive-session"
+            status_text = "✅ Active" if session[4] else "❌ Inactive"
+            
+            session_card = Div(
+                H5(f"Session: {session[0][:16]}..."),
+                P(f"📅 Created: {session[1].strftime('%B %d, %Y at %H:%M') if session[1] else 'Unknown'}"),
+                P(f"⏰ Expires: {session[5].strftime('%B %d, %Y at %H:%M') if session[5] else 'Unknown'}"),
+                P(f"🌐 IP Address: {session[2] or 'Unknown'}"),
+                P(f"💻 Device: {session[3][:50] + '...' if session[3] and len(session[3]) > 50 else session[3] or 'Unknown'}"),
+                P(f"Status: {status_text}", cls=f"session-status {status_class}"),
+                cls=f"session-card {status_class}"
+            )
+            session_cards.append(session_card)
+        
+        content = Div(
+            Div(
+                H2(f"Sessions for {target_user['first_name'] or 'Unknown'} {target_user['last_name'] or ''} ({target_user['email']})"),
+                P(f"Total sessions: {len(sessions)}"),
+                P(f"Active sessions: {len([s for s in sessions if s[4]])}"),
+                cls="sessions-header"
+            ),
+            Div(
+                *session_cards if session_cards else [P("No sessions found for this user.")],
+                cls="sessions-grid"
+            ),
+            Div(
+                A("Back to Users", href="/users", cls="btn btn-primary"),
+                A("Refresh", href=f"/users/{user_id}/sessions", cls="btn btn-secondary"),
+                cls="button-group"
+            )
+        )
+        
+        return Titled("User Sessions", create_app_layout(
+            content, 
+            user=user, 
+            current_page="/users",
+            page_title=f"Sessions for {target_user['email']}",
+            page_subtitle="Monitor user login sessions"
+        ))
+    
+    @app.get("/users/{user_id:int}/toggle")
+    def toggle_user_status(request, user_id: int):
+        # Admin-only: Toggle user active status
+        user = get_current_user(request, db, auth_service)
+        
+        if not user or user.get('role_id') != 0:
+            return RedirectResponse("/", status_code=302)
+        
+        # Get target user
+        target_user = db.get_user_with_role(user_id)
+        if not target_user:
+            return RedirectResponse("/users", status_code=302)
+        
+        # Prevent admin from disabling their own account
+        if target_user['id'] == user['id']:
+            return RedirectResponse("/users", status_code=302)
+        
+        try:
+            # Toggle user status
+            new_status = not target_user['is_active']
+            db.conn.execute("""
+                UPDATE users 
+                SET is_active = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            """, [new_status, user_id])
+            
+            # If deactivating user, invalidate all their sessions
+            if not new_status:
+                db.conn.execute("""
+                    UPDATE sessions 
+                    SET is_active = FALSE 
+                    WHERE user_id = ?
+                """, [user_id])
+            
+            status_text = "activated" if new_status else "deactivated"
+            content = Div(
+                create_success_message(f"User has been {status_text} successfully."),
+                P(A("Back to Users", href="/users", cls="btn btn-primary"))
+            )
+            return Titled("Status Updated", create_app_layout(
+                content, 
+                user=user,
+                page_title="Status Updated! ✅",
+                page_subtitle=f"User account has been {status_text}"
+            ))
+            
+        except Exception as e:
+            content = Div(
+                create_error_message(f"Failed to toggle user status: {str(e)}"),
+                P(A("Back to Users", href="/users", cls="btn btn-primary"))
+            )
+            return Titled("Toggle Failed", create_app_layout(
+                content, 
+                user=user,
+                page_title="Toggle Failed",
+                page_subtitle="An error occurred while changing user status"
+            ))
     
     @app.get("/health")
     def health_check():

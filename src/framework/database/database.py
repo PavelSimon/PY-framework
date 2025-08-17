@@ -24,6 +24,30 @@ class Database:
         self._conn.execute("CREATE SEQUENCE IF NOT EXISTS oauth_id_seq START 1;")
         self._conn.execute("CREATE SEQUENCE IF NOT EXISTS email_token_id_seq START 1;")
         self._conn.execute("CREATE SEQUENCE IF NOT EXISTS password_token_id_seq START 1;")
+        self._conn.execute("CREATE SEQUENCE IF NOT EXISTS role_id_seq START 1;")
+        
+        # Create roles table first
+        self._conn.execute("""
+            CREATE TABLE IF NOT EXISTS roles (
+                id INTEGER PRIMARY KEY DEFAULT nextval('role_id_seq'),
+                name VARCHAR UNIQUE NOT NULL,
+                description VARCHAR,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        
+        # Insert default roles if they don't exist
+        self._conn.execute("""
+            INSERT INTO roles (id, name, description) 
+            SELECT 0, 'admin', 'Administrator with full access'
+            WHERE NOT EXISTS (SELECT 1 FROM roles WHERE id = 0)
+        """)
+        
+        self._conn.execute("""
+            INSERT INTO roles (id, name, description) 
+            SELECT 1, 'user', 'Regular user with limited access'
+            WHERE NOT EXISTS (SELECT 1 FROM roles WHERE id = 1)
+        """)
         
         self._conn.execute("""
             CREATE TABLE IF NOT EXISTS users (
@@ -32,13 +56,15 @@ class Database:
                 password_hash VARCHAR NOT NULL,
                 first_name VARCHAR,
                 last_name VARCHAR,
+                role_id INTEGER DEFAULT 1,
                 is_active BOOLEAN DEFAULT TRUE,
                 is_verified BOOLEAN DEFAULT FALSE,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 last_login TIMESTAMP,
                 failed_login_attempts INTEGER DEFAULT 0,
-                locked_until TIMESTAMP
+                locked_until TIMESTAMP,
+                FOREIGN KEY (role_id) REFERENCES roles(id)
             )
         """)
         
@@ -97,6 +123,46 @@ class Database:
         
         self._conn.execute("""
             CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+        """)
+        
+        self._conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_users_role_id ON users(role_id);
+        """)
+        
+        # Migration: Add role_id column to existing users if not exists
+        try:
+            # Check if role_id column exists by trying to select it
+            self._conn.execute("SELECT role_id FROM users LIMIT 1")
+            print("role_id column already exists")
+        except Exception as e:
+            print(f"role_id column missing, attempting migration: {e}")
+            try:
+                # Column doesn't exist, add it
+                self._conn.execute("ALTER TABLE users ADD COLUMN role_id INTEGER DEFAULT 1")
+                print("✅ Successfully added role_id column to users table")
+                
+                # Update existing users to have the default role
+                self._conn.execute("UPDATE users SET role_id = 1 WHERE role_id IS NULL")
+                print("✅ Updated existing users with default role")
+                
+            except Exception as migration_error:
+                print(f"❌ Migration failed: {migration_error}")
+                print("⚠️  Database schema migration required!")
+                print("To fix: Stop the server, delete app.db, and restart to recreate with correct schema")
+                # Continue execution - the error will surface when trying to use role features
+        
+        # Ensure Pavel@pavel-simon.com is admin (role_id = 0)
+        self._conn.execute("""
+            UPDATE users 
+            SET role_id = 0 
+            WHERE email = 'Pavel@pavel-simon.com' AND role_id != 0
+        """)
+        
+        # Ensure all other users are regular users (role_id = 1)
+        self._conn.execute("""
+            UPDATE users 
+            SET role_id = 1 
+            WHERE email != 'Pavel@pavel-simon.com' AND role_id != 1
         """)
         
         self._conn.execute("""
@@ -264,6 +330,133 @@ class Database:
                 "provider_user_id": row[2], "provider_email": row[3]
             }
         return None
+
+    def get_user_with_role(self, user_id: int) -> Optional[Dict[str, Any]]:
+        """Get user information including role details"""
+        try:
+            cursor = self.conn.execute("""
+                SELECT u.id, u.email, u.password_hash, u.first_name, u.last_name,
+                       u.is_active, u.is_verified, u.created_at, u.updated_at, 
+                       u.last_login, u.failed_login_attempts, u.locked_until,
+                       u.role_id, r.name as role_name, r.description as role_description
+                FROM users u
+                LEFT JOIN roles r ON u.role_id = r.id
+                WHERE u.id = ?
+            """, [user_id])
+            row = cursor.fetchone()
+            if row:
+                return {
+                    "id": row[0], "email": row[1], "password_hash": row[2],
+                    "first_name": row[3], "last_name": row[4], "is_active": row[5],
+                    "is_verified": row[6], "created_at": row[7], "updated_at": row[8],
+                    "last_login": row[9], "failed_login_attempts": row[10], 
+                    "locked_until": row[11], "role_id": row[12], 
+                    "role_name": row[13], "role_description": row[14]
+                }
+        except Exception as e:
+            print(f"Error in get_user_with_role: {e}")
+            # Fallback to basic user info without role
+            try:
+                cursor = self.conn.execute("""
+                    SELECT id, email, password_hash, first_name, last_name,
+                           is_active, is_verified, created_at, updated_at, 
+                           last_login, failed_login_attempts, locked_until
+                    FROM users WHERE id = ?
+                """, [user_id])
+                row = cursor.fetchone()
+                if row:
+                    return {
+                        "id": row[0], "email": row[1], "password_hash": row[2],
+                        "first_name": row[3], "last_name": row[4], "is_active": row[5],
+                        "is_verified": row[6], "created_at": row[7], "updated_at": row[8],
+                        "last_login": row[9], "failed_login_attempts": row[10], 
+                        "locked_until": row[11], "role_id": 1,  # Default to regular user
+                        "role_name": "user", "role_description": "Regular user"
+                    }
+            except Exception as fallback_error:
+                print(f"Fallback query also failed: {fallback_error}")
+        return None
+
+    def get_all_users_with_roles(self) -> list:
+        """Get all users with their role information"""
+        try:
+            cursor = self.conn.execute("""
+                SELECT u.id, u.email, u.first_name, u.last_name,
+                       u.is_active, u.is_verified, u.created_at, u.last_login,
+                       u.role_id, r.name as role_name
+                FROM users u
+                LEFT JOIN roles r ON u.role_id = r.id
+                ORDER BY u.created_at DESC
+            """)
+            rows = cursor.fetchall()
+            return [
+                {
+                    "id": row[0], "email": row[1], "first_name": row[2], 
+                    "last_name": row[3], "is_active": row[4], "is_verified": row[5],
+                    "created_at": row[6], "last_login": row[7], "role_id": row[8],
+                    "role_name": row[9]
+                }
+                for row in rows
+            ]
+        except Exception as e:
+            print(f"Error in get_all_users_with_roles: {e}")
+            # Fallback to basic user info without roles
+            try:
+                cursor = self.conn.execute("""
+                    SELECT id, email, first_name, last_name,
+                           is_active, is_verified, created_at, last_login
+                    FROM users
+                    ORDER BY created_at DESC
+                """)
+                rows = cursor.fetchall()
+                return [
+                    {
+                        "id": row[0], "email": row[1], "first_name": row[2], 
+                        "last_name": row[3], "is_active": row[4], "is_verified": row[5],
+                        "created_at": row[6], "last_login": row[7], "role_id": 1,
+                        "role_name": "user"
+                    }
+                    for row in rows
+                ]
+            except Exception as fallback_error:
+                print(f"Fallback query also failed: {fallback_error}")
+                return []
+
+    def get_role(self, role_id: int) -> Optional[Dict[str, Any]]:
+        """Get role information by ID"""
+        cursor = self.conn.execute("""
+            SELECT id, name, description, created_at
+            FROM roles
+            WHERE id = ?
+        """, [role_id])
+        row = cursor.fetchone()
+        if row:
+            return {
+                "id": row[0], "name": row[1], 
+                "description": row[2], "created_at": row[3]
+            }
+        return None
+
+    def is_admin(self, user_id: int) -> bool:
+        """Check if user is an admin (role_id = 0)"""
+        cursor = self.conn.execute("""
+            SELECT role_id FROM users WHERE id = ?
+        """, [user_id])
+        row = cursor.fetchone()
+        return row and row[0] == 0
+
+    def update_user_role(self, user_id: int, role_id: int) -> bool:
+        """Update user's role"""
+        try:
+            self.conn.execute("""
+                UPDATE users 
+                SET role_id = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            """, [role_id, user_id])
+            return True
+        except Exception as e:
+            print(f"Error updating user role: {e}")
+            return False
 
     def close(self):
         if self.conn:

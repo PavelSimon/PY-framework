@@ -395,6 +395,138 @@ csrf_token: string (required if CSRF enabled) - CSRF protection token
 - Tokens are session-bound for security
 - Failed CSRF validation returns 403 Forbidden
 
+## Admin Endpoints ✅ NEW
+
+### User Management
+
+#### `GET /users`
+**Description**: User management page (admin view vs personal view)
+**Authentication**: Session required
+**Role Requirements**: None (view changes based on role)
+**Response**: 
+- Admin users: Full user management interface with all users
+- Regular users: Personal account view only
+
+**Admin Features**:
+- User statistics and summary
+- Complete user list with roles
+- Admin tools and actions
+- Quick access to user management functions
+
+#### `GET /users/{user_id}/edit-role`
+**Description**: Display user role editing form
+**Authentication**: Session required
+**Role Requirements**: Administrator (role_id = 0)
+**Response**: Role editing form for specified user
+
+**URL Parameters**:
+```
+user_id: integer (required) - ID of user to edit
+```
+
+**Security Features**:
+- Admin cannot edit their own role
+- CSRF protection enabled
+- Role validation on target user
+
+#### `POST /users/{user_id}/edit-role`
+**Description**: Update user role
+**Authentication**: Session required
+**Role Requirements**: Administrator (role_id = 0)
+
+**URL Parameters**:
+```
+user_id: integer (required) - ID of user to edit
+```
+
+**Request Body** (form data):
+```
+role_id: integer (required) - New role ID (0=admin, 1=user)
+csrf_token: string (required) - CSRF protection token
+```
+
+**Response**:
+- Success: Role updated confirmation
+- Error: Edit form with error messages
+
+**Security Features**:
+- Admin cannot edit their own role
+- Role ID validation (must be 0 or 1)
+- CSRF protection required
+
+#### `GET /users/{user_id}/sessions`
+**Description**: View user's active and historical sessions
+**Authentication**: Session required
+**Role Requirements**: Administrator (role_id = 0)
+**Response**: Session monitoring page for specified user
+
+**URL Parameters**:
+```
+user_id: integer (required) - ID of user to view sessions for
+```
+
+**Session Information Displayed**:
+- Session ID (truncated for security)
+- Creation and expiration times
+- IP address and user agent
+- Active/inactive status
+- Device information
+
+#### `GET /users/{user_id}/toggle`
+**Description**: Toggle user account active status
+**Authentication**: Session required
+**Role Requirements**: Administrator (role_id = 0)
+
+**URL Parameters**:
+```
+user_id: integer (required) - ID of user to toggle status
+```
+
+**Response**: Status update confirmation
+
+**Security Features**:
+- Admin cannot deactivate their own account
+- Account deactivation invalidates all user sessions
+- Immediate effect on user access
+
+**Behavior**:
+- Active users are deactivated
+- Inactive users are reactivated
+- Deactivation prevents login and invalidates sessions
+- Reactivation allows immediate login
+
+## Role-Based Security ✅ NEW
+
+### Access Control
+- **Admin Routes**: Require role_id = 0 (Administrator)
+- **User Routes**: Require any authenticated user
+- **Self-Protection**: Admins cannot modify their own accounts
+- **Role Validation**: All admin actions validate user permissions
+
+### Permission Levels
+```
+Role ID 0 (Administrator):
+- Full user management access
+- Can edit other users' roles
+- Can view all user sessions
+- Can activate/deactivate accounts
+- Cannot modify own account
+
+Role ID 1 (Regular User):
+- Personal account access only
+- Can edit own profile
+- Can change own password
+- Can view own sessions
+- No admin functionality
+```
+
+### Security Features
+- All admin actions require CSRF tokens
+- Role validation on every request
+- Session-based authentication
+- Automatic permission checking
+- Graceful access denial handling
+
 ## Error Handling
 
 ### Common HTTP Status Codes

@@ -180,8 +180,8 @@ class AuthenticationService:
         if not is_valid or not session:
             return None
         
-        # Get full user data
-        user = db.get_user_by_id(session['user_id'])
+        # Get full user data with role information
+        user = db.get_user_with_role(session['user_id'])
         return user
 
     def cleanup_expired_sessions(self, db):

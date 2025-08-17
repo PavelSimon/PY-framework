@@ -69,9 +69,17 @@ PY-framework/
 - **Email Verification**: Secure email confirmation for new accounts
 - **Password Reset**: Secure password reset flow with time-limited tokens
 
+### Role-Based Access Control (RBAC) ✅ NEW
+- **User Roles**: Administrator (role_id=0) and Regular User (role_id=1) roles
+- **Admin Management**: Full user management interface with role assignment
+- **Permission Control**: Route-level access control based on user roles
+- **Security Middleware**: Comprehensive role validation and protection
+- **Admin Actions**: User role editing, account status management, session monitoring
+- **Self-Protection**: Admins cannot modify their own accounts for security
+
 ### OAuth Integration
-- **Google OAuth**: Secure Google Sign-In integration
-- **GitHub OAuth**: GitHub authentication support
+- **Google OAuth**: Secure Google Sign-In integration (planned)
+- **GitHub OAuth**: GitHub authentication support (planned)
 - **State Validation**: CSRF protection for OAuth flows
 - **Token Management**: Secure storage and handling of OAuth tokens
 
@@ -83,7 +91,18 @@ PY-framework/
 
 ## 📊 Database Schema
 
-### Users Table
+### Roles Table ✅ NEW
+```sql
+roles (
+    id INTEGER PRIMARY KEY,
+    name VARCHAR UNIQUE NOT NULL,
+    description VARCHAR,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+)
+-- Default roles: 0=admin, 1=user
+```
+
+### Users Table (Updated)
 ```sql
 users (
     id INTEGER PRIMARY KEY,
@@ -91,13 +110,15 @@ users (
     password_hash VARCHAR NOT NULL,
     first_name VARCHAR,
     last_name VARCHAR,
+    role_id INTEGER DEFAULT 1,  -- ✅ NEW: Foreign key to roles table
     is_active BOOLEAN DEFAULT TRUE,
     is_verified BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     last_login TIMESTAMP,
     failed_login_attempts INTEGER DEFAULT 0,
-    locked_until TIMESTAMP
+    locked_until TIMESTAMP,
+    FOREIGN KEY (role_id) REFERENCES roles(id)
 )
 ```
 
@@ -153,18 +174,29 @@ sessions (
 - [x] Basic HTML templates and forms
 - [x] CSRF protection middleware
 
-### Phase 3: OAuth Integration
+### Phase 3: Role-Based Access Control ✅ (COMPLETED)
+- [x] Role-based database schema (roles and user roles)
+- [x] Admin and regular user role system
+- [x] Role validation middleware and security
+- [x] Admin user management interface
+- [x] User role assignment and editing
+- [x] Account status management (activate/deactivate)
+- [x] Session monitoring and management
+- [x] Comprehensive role-based testing
+
+### Phase 4: OAuth Integration
 - [ ] Google OAuth implementation
 - [ ] GitHub OAuth implementation
 - [ ] OAuth callback handling
 - [ ] Account linking for existing users
 
-### Phase 4: Advanced Features
-- [ ] User profile management
+### Phase 5: Advanced Features
+- [x] User profile management
+- [x] Advanced security logging
+- [x] Email templates and notifications
+- [x] Admin dashboard and user management
 - [ ] Two-factor authentication (2FA)
-- [ ] Advanced security logging
-- [ ] Email templates and notifications
-- [ ] Admin dashboard
+- [ ] Advanced audit logging
 
 ### Phase 5: Production Ready
 - [ ] Comprehensive testing suite
@@ -333,8 +365,21 @@ The framework implements a clean, modular route architecture for better maintain
 - `GET /` - Homepage (different for dev/prod)
 - `GET /dashboard` - User dashboard
 - `GET /profile` - Profile edit page
+- `POST /profile` - Update user profile
+- `GET /profile/change-password` - Change password page
+- `POST /profile/change-password` - Change password processing
 - `GET /page1` - Sample navigation page
+- `GET /users` - User management page (admin view vs personal view)
+- `GET /settings` - Comprehensive settings and account management
+- `GET /docs` - Documentation index (redirects to overview)
+- `GET /docs/{doc_name}` - Documentation viewer with markdown rendering
 - `GET /health` - Health check endpoint
+
+### Admin-Only Routes ✅ NEW (`src/framework/routes/main.py`)
+- `GET /users/{user_id}/edit-role` - Edit user role page (admin only)
+- `POST /users/{user_id}/edit-role` - Update user role (admin only)
+- `GET /users/{user_id}/sessions` - View user sessions (admin only)
+- `GET /users/{user_id}/toggle` - Toggle user active status (admin only)
 
 ### Development Routes (`src/framework/routes/dev.py`)
 - `GET /dev/test-email` - Email service testing tool
@@ -347,11 +392,6 @@ The framework implements a clean, modular route architecture for better maintain
 - `GET /auth/google/callback` - Google OAuth callback
 - `GET /auth/github` - GitHub OAuth initiation
 - `GET /auth/github/callback` - GitHub OAuth callback
-
-### User Management Routes (`src/framework/routes/main.py`)
-- `POST /profile` - Update user profile
-- `GET /profile/change-password` - Change password page
-- `POST /profile/change-password` - Change password processing
 
 ## 🔒 Security Considerations
 
@@ -372,6 +412,14 @@ The framework implements a clean, modular route architecture for better maintain
 - 30-minute lockout period
 - Global rate limiting per IP
 - API endpoint rate limiting
+
+### Role-Based Security ✅ NEW
+- **Admin Protection**: Administrators cannot modify their own accounts
+- **Permission Validation**: All admin routes validate user roles
+- **Session Security**: Account deactivation invalidates all user sessions
+- **CSRF Protection**: All admin actions protected with CSRF tokens
+- **Access Control**: Route-level permission checking with fallbacks
+- **Role Validation**: Comprehensive middleware for role-based access
 
 ### OAuth Security
 - State parameter for CSRF protection
@@ -497,18 +545,19 @@ CMD ["python", "app.py"]
 
 ### 🔄 NEXT DEVELOPMENT STEPS
 1. **OAuth Integration** - Google and GitHub OAuth providers
-2. **Two-Factor Authentication** - Enhanced account security
-3. **Admin Dashboard** - User management and system monitoring
+2. **Two-Factor Authentication** - Enhanced account security  
+3. **Advanced Audit Logging** - Comprehensive security event tracking
 4. **Production Deploy** - Docker, monitoring, and deployment guides
 5. **Performance Optimization** - Caching and database optimization
 
 ### 📊 TESTING STATUS
-- **Total Tests**: 68/68 passing ✅
+- **Total Tests**: 87/87 passing ✅
 - **Email Service**: 11/11 tests ✅
 - **Registration**: 7/7 tests ✅  
 - **Login System**: 11/11 tests ✅
 - **CSRF Protection**: 14/14 tests ✅
 - **Security Middleware**: 25/25 tests ✅
+- **Role-Based Access Control**: 19/19 tests ✅ NEW
 - **Navigation Layout**: Fully implemented and tested ✅
 - **Code Coverage**: Comprehensive test coverage for all core features
 
