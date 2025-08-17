@@ -3,6 +3,7 @@ Authentication route handlers for PY-Framework
 """
 
 from fasthtml.common import *
+from starlette.responses import RedirectResponse
 from ..auth import UserRegistration
 from ..email import EmailService
 from ..layout import create_auth_layout, create_page_title, create_success_message, create_error_message, create_warning_message
@@ -42,6 +43,18 @@ def create_auth_routes(app, db, auth_service, email_service=None, csrf_protectio
                 action="/auth/login",
                 method="post",
                 cls="form"
+            ),
+            # OAuth login options
+            Div(
+                Hr(),
+                P("Or sign in with:", style="text-align: center; margin: 1rem 0 0.5rem 0; color: #666;"),
+                Div(
+                    A("🔍 Sign in with Google", href="/auth/google", cls="btn btn-google", style="display: inline-block; margin-right: 0.5rem; padding: 0.5rem 1rem; background-color: #4285f4; color: white; text-decoration: none; border-radius: 4px;"),
+                    A("🐙 Sign in with GitHub", href="/auth/github", cls="btn btn-github", style="display: inline-block; padding: 0.5rem 1rem; background-color: #333; color: white; text-decoration: none; border-radius: 4px;"),
+                    style="text-align: center; margin-bottom: 1rem;"
+                ),
+                Hr(),
+                style="margin: 1.5rem 0;"
             ),
             P(A("Don't have an account? Register here", href="/auth/register")),
             P(A("Forgot your password?", href="/auth/forgot-password"))
@@ -760,5 +773,339 @@ def create_auth_routes(app, db, auth_service, email_service=None, csrf_protectio
             return Titled("Reset Failed", create_auth_layout(
                 content,
                 page_title="Reset Failed",
+                page_subtitle="An error occurred"
+            ))
+    
+    # OAuth Routes
+    @app.get("/auth/{provider}")
+    def oauth_login(provider: str):
+        """Initiate OAuth login flow"""
+        try:
+            from ..oauth import OAuthService
+            oauth_service = OAuthService()
+            
+            # Validate provider
+            if provider not in ['google', 'github']:
+                content = Div(
+                    create_error_message(f"OAuth provider '{provider}' is not supported."),
+                    P("Supported providers: Google, GitHub"),
+                    P(A("Back to Login", href="/auth/login", cls="btn btn-primary"))
+                )
+                return Titled("Invalid Provider", create_auth_layout(
+                    content,
+                    page_title="Invalid OAuth Provider",
+                    page_subtitle="Provider not supported"
+                ))
+            
+            # Get authorization URL
+            auth_url = oauth_service.get_auth_url(provider)
+            if not auth_url:
+                content = Div(
+                    create_error_message(f"{provider.title()} OAuth is not configured properly."),
+                    P("Possible issues:"),
+                    Ul(
+                        Li("Missing OAuth client credentials in .env file"),
+                        Li("Invalid redirect URI configuration"),
+                        Li("OAuth app not properly set up with provider")
+                    ),
+                    P("Please check the OAuth configuration in settings."),
+                    P(A("Back to Login", href="/auth/login", cls="btn btn-primary"))
+                )
+                return Titled("OAuth Not Configured", create_auth_layout(
+                    content,
+                    page_title="OAuth Not Available",
+                    page_subtitle="Service not configured"
+                ))
+            
+            # Redirect to provider authorization page
+            return RedirectResponse(auth_url, status_code=302)
+            
+        except Exception as e:
+            print(f"OAuth initiation error: {e}")
+            content = Div(
+                create_error_message("Failed to initiate OAuth login. Please try again."),
+                P(A("Back to Login", href="/auth/login", cls="btn btn-primary"))
+            )
+            return Titled("OAuth Error", create_auth_layout(
+                content,
+                page_title="OAuth Login Failed",
+                page_subtitle="An error occurred"
+            ))
+    
+    @app.get("/auth/{provider}/callback")
+    def oauth_callback(request, provider: str, code: str = None, state: str = None, error: str = None):
+        """Handle OAuth callback"""
+        try:
+            from ..oauth import OAuthService
+            oauth_service = OAuthService()
+            
+            # Check for OAuth errors
+            if error:
+                error_descriptions = {
+                    'access_denied': 'You cancelled the authorization request.',
+                    'invalid_request': 'The OAuth request was invalid.',
+                    'unsupported_response_type': 'OAuth configuration error.',
+                }
+                error_msg = error_descriptions.get(error, f"OAuth error: {error}")
+                
+                content = Div(
+                    create_error_message(error_msg),
+                    P("Please try logging in again."),
+                    P(A("Back to Login", href="/auth/login", cls="btn btn-primary"))
+                )
+                return Titled("OAuth Error", create_auth_layout(
+                    content,
+                    page_title="OAuth Authorization Failed",
+                    page_subtitle="Authorization was not granted"
+                ))
+            
+            # Validate required parameters
+            if not code or not state:
+                content = Div(
+                    create_error_message("Missing required OAuth parameters."),
+                    P("The OAuth callback is missing required information."),
+                    P(A("Try Again", href="/auth/login", cls="btn btn-primary"))
+                )
+                return Titled("OAuth Error", create_auth_layout(
+                    content,
+                    page_title="OAuth Callback Error",
+                    page_subtitle="Missing parameters"
+                ))
+            
+            # Validate state parameter (CSRF protection)
+            if not oauth_service.validate_state_token(state, provider):
+                content = Div(
+                    create_error_message("Invalid OAuth state token."),
+                    P("This may be a security issue or an expired request."),
+                    P(A("Try Again", href="/auth/login", cls="btn btn-primary"))
+                )
+                return Titled("Security Error", create_auth_layout(
+                    content,
+                    page_title="OAuth Security Error",
+                    page_subtitle="Invalid state token"
+                ))
+            
+            # Get OAuth provider
+            oauth_provider = oauth_service.get_provider(provider)
+            if not oauth_provider:
+                content = Div(
+                    create_error_message(f"OAuth provider '{provider}' is not available."),
+                    P(A("Back to Login", href="/auth/login", cls="btn btn-primary"))
+                )
+                return Titled("Provider Unavailable", create_auth_layout(
+                    content,
+                    page_title="OAuth Provider Unavailable",
+                    page_subtitle="Provider not configured"
+                ))
+            
+            # Process OAuth callback synchronously with error handling
+            try:
+                import asyncio
+                
+                # Create new event loop for this thread if needed
+                try:
+                    loop = asyncio.get_event_loop()
+                except RuntimeError:
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                
+                return loop.run_until_complete(process_oauth_callback_async(
+                    oauth_service, oauth_provider, provider, code, state, request, db, auth_service
+                ))
+            except Exception as async_error:
+                print(f"OAuth callback async processing error: {async_error}")
+                content = Div(
+                    create_error_message("Failed to process OAuth login. Please try again."),
+                    P(f"Error details: {str(async_error)}"),
+                    P(A("Back to Login", href="/auth/login", cls="btn btn-primary"))
+                )
+                return Titled("OAuth Error", create_auth_layout(
+                    content,
+                    page_title="OAuth Login Failed",
+                    page_subtitle="Processing error occurred"
+                ))
+            
+        except Exception as e:
+            print(f"OAuth callback error: {e}")
+            content = Div(
+                create_error_message("Failed to process OAuth login. Please try again."),
+                P(A("Back to Login", href="/auth/login", cls="btn btn-primary"))
+            )
+            return Titled("OAuth Error", create_auth_layout(
+                content,
+                page_title="OAuth Login Failed",
+                page_subtitle="An error occurred"
+            ))
+    
+    async def process_oauth_callback_async(oauth_service, oauth_provider, provider, code, state, request, db, auth_service):
+        """Process OAuth callback asynchronously"""
+        try:
+            # Exchange code for token
+            token_data = await oauth_provider.exchange_code_for_token(code, state)
+            if not token_data:
+                content = Div(
+                    create_error_message("Failed to exchange OAuth code for token."),
+                    P("The authorization may have expired or failed."),
+                    P(A("Try Again", href="/auth/login", cls="btn btn-primary"))
+                )
+                return Titled("OAuth Error", create_auth_layout(
+                    content,
+                    page_title="OAuth Token Exchange Failed",
+                    page_subtitle="Authorization failed"
+                ))
+            
+            # Get user information from provider
+            user_info = await oauth_provider.get_user_info(token_data["access_token"])
+            if not user_info:
+                content = Div(
+                    create_error_message("Failed to get user information from OAuth provider."),
+                    P("Please try again or use a different login method."),
+                    P(A("Back to Login", href="/auth/login", cls="btn btn-primary"))
+                )
+                return Titled("OAuth Error", create_auth_layout(
+                    content,
+                    page_title="OAuth User Info Failed",
+                    page_subtitle="Could not retrieve user information"
+                ))
+            
+            # Check if user exists with this OAuth account
+            existing_user = oauth_service.find_user_by_oauth(provider, user_info["provider_user_id"])
+            
+            if existing_user:
+                # User exists, log them in
+                if not existing_user["is_active"]:
+                    content = Div(
+                        create_error_message("Your account has been deactivated."),
+                        P("Please contact support for assistance."),
+                        P(A("Back to Login", href="/auth/login", cls="btn btn-primary"))
+                    )
+                    return Titled("Account Deactivated", create_auth_layout(
+                        content,
+                        page_title="Account Deactivated",
+                        page_subtitle="Account access disabled"
+                    ))
+                
+                # Update OAuth token information
+                from datetime import datetime, timedelta
+                expires_at = None
+                if token_data.get("expires_in"):
+                    expires_at = datetime.now() + timedelta(seconds=token_data["expires_in"])
+                
+                oauth_service.link_oauth_account(
+                    user_id=existing_user["id"],
+                    provider=provider,
+                    provider_user_id=user_info["provider_user_id"],
+                    provider_email=user_info["email"],
+                    access_token=token_data["access_token"],
+                    refresh_token=token_data.get("refresh_token"),
+                    expires_at=expires_at
+                )
+                
+                # Create session and log user in
+                client_ip = request.client.host if hasattr(request, 'client') else None
+                user_agent = request.headers.get('user-agent')
+                
+                session_id = auth_service.create_session(db, existing_user["id"], client_ip, user_agent)
+                store_session(session_id, existing_user["id"])
+                
+                # Update login timestamp
+                db.update_user_login(existing_user["id"], reset_failed_attempts=True)
+                
+                return RedirectResponse("/dashboard", status_code=302)
+            
+            else:
+                # Check if user exists with same email (for account linking)
+                email_user = oauth_service.find_user_by_email(user_info["email"])
+                
+                if email_user:
+                    # Account linking flow - user exists with same email
+                    if not email_user["is_active"]:
+                        content = Div(
+                            create_error_message("An account with this email is deactivated."),
+                            P("Please contact support for assistance."),
+                            P(A("Back to Login", href="/auth/login", cls="btn btn-primary"))
+                        )
+                        return Titled("Account Deactivated", create_auth_layout(
+                            content,
+                            page_title="Account Deactivated",
+                            page_subtitle="Account access disabled"
+                        ))
+                    
+                    # Link OAuth account to existing user
+                    from datetime import datetime, timedelta
+                    expires_at = None
+                    if token_data.get("expires_in"):
+                        expires_at = datetime.now() + timedelta(seconds=token_data["expires_in"])
+                    
+                    oauth_service.link_oauth_account(
+                        user_id=email_user["id"],
+                        provider=provider,
+                        provider_user_id=user_info["provider_user_id"],
+                        provider_email=user_info["email"],
+                        access_token=token_data["access_token"],
+                        refresh_token=token_data.get("refresh_token"),
+                        expires_at=expires_at
+                    )
+                    
+                    # Create session and log user in
+                    client_ip = request.client.host if hasattr(request, 'client') else None
+                    user_agent = request.headers.get('user-agent')
+                    
+                    session_id = auth_service.create_session(db, email_user["id"], client_ip, user_agent)
+                    store_session(session_id, email_user["id"])
+                    
+                    # Update login timestamp
+                    db.update_user_login(email_user["id"], reset_failed_attempts=True)
+                    
+                    return RedirectResponse("/dashboard", status_code=302)
+                
+                else:
+                    # Create new user from OAuth information
+                    from datetime import datetime, timedelta
+                    expires_at = None
+                    if token_data.get("expires_in"):
+                        expires_at = datetime.now() + timedelta(seconds=token_data["expires_in"])
+                    
+                    user_id = oauth_service.create_user_from_oauth(
+                        provider=provider,
+                        user_info=user_info,
+                        access_token=token_data["access_token"],
+                        refresh_token=token_data.get("refresh_token"),
+                        expires_at=expires_at
+                    )
+                    
+                    if not user_id:
+                        content = Div(
+                            create_error_message("Failed to create user account."),
+                            P("Please try again or contact support."),
+                            P(A("Back to Login", href="/auth/login", cls="btn btn-primary"))
+                        )
+                        return Titled("Account Creation Failed", create_auth_layout(
+                            content,
+                            page_title="Account Creation Failed",
+                            page_subtitle="Could not create account"
+                        ))
+                    
+                    # Create session and log new user in
+                    client_ip = request.client.host if hasattr(request, 'client') else None
+                    user_agent = request.headers.get('user-agent')
+                    
+                    session_id = auth_service.create_session(db, user_id, client_ip, user_agent)
+                    store_session(session_id, user_id)
+                    
+                    # Update login timestamp
+                    db.update_user_login(user_id, reset_failed_attempts=True)
+                    
+                    return RedirectResponse("/dashboard", status_code=302)
+        
+        except Exception as e:
+            print(f"OAuth callback processing error: {e}")
+            content = Div(
+                create_error_message("Failed to process OAuth login. Please try again."),
+                P(A("Back to Login", href="/auth/login", cls="btn btn-primary"))
+            )
+            return Titled("OAuth Error", create_auth_layout(
+                content,
+                page_title="OAuth Login Failed",
                 page_subtitle="An error occurred"
             ))

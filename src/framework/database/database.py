@@ -172,6 +172,95 @@ class Database:
         self._conn.execute("""
             CREATE INDEX IF NOT EXISTS idx_oauth_provider_user ON oauth_accounts(provider, provider_user_id);
         """)
+        
+        # Two-Factor Authentication tables
+        self._conn.execute("CREATE SEQUENCE IF NOT EXISTS totp_id_seq START 1;")
+        self._conn.execute("CREATE SEQUENCE IF NOT EXISTS backup_code_id_seq START 1;")
+        self._conn.execute("CREATE SEQUENCE IF NOT EXISTS two_factor_token_id_seq START 1;")
+        self._conn.execute("CREATE SEQUENCE IF NOT EXISTS oauth_state_id_seq START 1;")
+        
+        self._conn.execute("""
+            CREATE TABLE IF NOT EXISTS totp_secrets (
+                id INTEGER PRIMARY KEY DEFAULT nextval('totp_id_seq'),
+                user_id INTEGER NOT NULL,
+                secret VARCHAR NOT NULL,
+                enabled BOOLEAN DEFAULT TRUE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id),
+                UNIQUE(user_id)
+            )
+        """)
+        
+        self._conn.execute("""
+            CREATE TABLE IF NOT EXISTS backup_codes (
+                id INTEGER PRIMARY KEY DEFAULT nextval('backup_code_id_seq'),
+                user_id INTEGER NOT NULL,
+                code_hash VARCHAR NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                used_at TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )
+        """)
+        
+        self._conn.execute("""
+            CREATE TABLE IF NOT EXISTS two_factor_tokens (
+                id INTEGER PRIMARY KEY DEFAULT nextval('two_factor_token_id_seq'),
+                user_id INTEGER NOT NULL,
+                token VARCHAR UNIQUE NOT NULL,
+                expires_at TIMESTAMP NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )
+        """)
+        
+        self._conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_totp_user_id ON totp_secrets(user_id);
+        """)
+        
+        self._conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_backup_codes_user_id ON backup_codes(user_id);
+        """)
+        
+        self._conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_two_factor_tokens_token ON two_factor_tokens(token);
+        """)
+        
+        # OAuth state tokens table
+        self._conn.execute("""
+            CREATE TABLE IF NOT EXISTS oauth_state_tokens (
+                id INTEGER PRIMARY KEY DEFAULT nextval('oauth_state_id_seq'),
+                state_token VARCHAR UNIQUE NOT NULL,
+                provider VARCHAR NOT NULL,
+                session_id VARCHAR,
+                expires_at TIMESTAMP NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        
+        self._conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_oauth_state_token ON oauth_state_tokens(state_token);
+        """)
+        
+        # Migration: Add two_factor_enabled column to users table
+        try:
+            # Check if two_factor_enabled column exists
+            self._conn.execute("SELECT two_factor_enabled FROM users LIMIT 1")
+            print("two_factor_enabled column already exists")
+        except Exception as e:
+            print(f"two_factor_enabled column missing, attempting migration: {e}")
+            try:
+                # Column doesn't exist, add it
+                self._conn.execute("ALTER TABLE users ADD COLUMN two_factor_enabled BOOLEAN DEFAULT FALSE")
+                print("✅ Successfully added two_factor_enabled column to users table")
+                
+                # Update existing users to have 2FA disabled by default
+                self._conn.execute("UPDATE users SET two_factor_enabled = FALSE WHERE two_factor_enabled IS NULL")
+                print("✅ Updated existing users with 2FA disabled by default")
+                
+            except Exception as migration_error:
+                print(f"❌ 2FA Migration failed: {migration_error}")
+                print("⚠️  Database schema migration required!")
+                # Continue execution - the error will surface when trying to use 2FA features
 
     def create_user(self, email: str, password_hash: str, first_name: str = None, last_name: str = None) -> int:
         cursor = self.conn.execute("""

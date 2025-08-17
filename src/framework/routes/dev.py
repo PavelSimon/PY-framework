@@ -4,6 +4,7 @@ These routes are only available in development mode
 """
 
 from fasthtml.common import *
+from starlette.responses import RedirectResponse
 from ..layout import create_app_layout, create_page_title
 from ..session import get_current_user
 
@@ -153,4 +154,83 @@ def create_dev_routes(app, db=None, auth_service=None, email_service=None, setti
             current_page="/dev/database",
             page_title="Database Inspector",
             page_subtitle="View database status and basic info"
+        ))
+    
+    @app.get("/dev/oauth-debug")
+    def oauth_debug(request):
+        # OAuth configuration debug tool
+        user = get_current_user(request, db, auth_service)
+        
+        if not user:
+            return RedirectResponse("/auth/login", status_code=302)
+        
+        from ..oauth import OAuthService
+        from ..config import settings
+        
+        oauth_service = OAuthService(db)
+        
+        content = Div(
+            H2("OAuth Configuration Debug"),
+            
+            H3("🔍 Google OAuth Configuration"),
+            Div(
+                P(f"Client ID: {'✅ Configured' if settings.google_client_id else '❌ Missing'}"),
+                P(f"Client Secret: {'✅ Configured' if settings.google_client_secret else '❌ Missing'}"),
+                P(f"Redirect URI: {settings.google_redirect_uri}"),
+                P(f"Status: {'✅ Ready' if settings.is_oauth_configured('google') else '❌ Not Configured'}"),
+                style="margin: 1rem 0; padding: 1rem; border: 1px solid #ddd; border-radius: 4px;"
+            ),
+            
+            H3("🐙 GitHub OAuth Configuration"),
+            Div(
+                P(f"Client ID: {'✅ Configured' if settings.github_client_id else '❌ Missing'}"),
+                P(f"Client Secret: {'✅ Configured' if settings.github_client_secret else '❌ Missing'}"),
+                P(f"Redirect URI: {settings.github_redirect_uri}"),
+                P(f"Status: {'✅ Ready' if settings.is_oauth_configured('github') else '❌ Not Configured'}"),
+                style="margin: 1rem 0; padding: 1rem; border: 1px solid #ddd; border-radius: 4px;"
+            ),
+            
+            H3("🔗 Test OAuth URLs"),
+            Div(
+                P("Google Auth URL:"),
+                Pre(Code(oauth_service.get_auth_url("google") or "❌ Failed to generate")),
+                P("GitHub Auth URL:"),
+                Pre(Code(oauth_service.get_auth_url("github") or "❌ Failed to generate")),
+                style="margin: 1rem 0; padding: 1rem; border: 1px solid #ddd; border-radius: 4px;"
+            ),
+            
+            H3("⚠️ Common Issues"),
+            Ul(
+                Li("Redirect URI mismatch: Ensure Google/GitHub app redirect URI exactly matches the URLs above"),
+                Li("Missing credentials: Check .env file has correct GOOGLE_CLIENT_ID/SECRET and GITHUB_CLIENT_ID/SECRET"),
+                Li("API not enabled: For Google, ensure Google+ API is enabled in Cloud Console"),
+                Li("Wrong environment: Make sure you're using development/localhost settings")
+            ),
+            
+            H3("🔧 Setup Instructions"),
+            Div(
+                H4("Google OAuth Setup:"),
+                Ol(
+                    Li("Go to Google Cloud Console → APIs & Services → Credentials"),
+                    Li("Create OAuth 2.0 Client ID (Web application)"),
+                    Li(f"Add redirect URI: {settings.google_redirect_uri}"),
+                    Li("Copy Client ID and Secret to .env file")
+                ),
+                H4("GitHub OAuth Setup:"),
+                Ol(
+                    Li("Go to GitHub Settings → Developer settings → OAuth Apps"),
+                    Li("Create new OAuth App"),
+                    Li(f"Set Authorization callback URL: {settings.github_redirect_uri}"),
+                    Li("Copy Client ID and Secret to .env file")
+                ),
+                style="margin: 1rem 0; padding: 1rem; border: 1px solid #ddd; border-radius: 4px;"
+            )
+        )
+        
+        return Titled("OAuth Debug", create_app_layout(
+            content, 
+            user=user, 
+            current_page="/dev/oauth-debug",
+            page_title="OAuth Configuration Debug",
+            page_subtitle="Debug OAuth provider configurations"
         ))

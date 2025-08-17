@@ -59,6 +59,23 @@ class Settings(BaseSettings):
         if isinstance(v, str):
             return [origin.strip() for origin in v.split(',') if origin.strip()]
         return v
+    
+    def is_oauth_configured(self, provider: str) -> bool:
+        """Check if OAuth provider is properly configured"""
+        if provider == "google":
+            return bool(self.google_client_id and self.google_client_secret)
+        elif provider == "github":
+            return bool(self.github_client_id and self.github_client_secret)
+        return False
+    
+    def get_oauth_providers(self) -> List[str]:
+        """Get list of configured OAuth providers"""
+        providers = []
+        if self.is_oauth_configured("google"):
+            providers.append("google")
+        if self.is_oauth_configured("github"):
+            providers.append("github")
+        return providers
 
 
 def get_settings() -> Settings:
