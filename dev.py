@@ -22,7 +22,7 @@ from src.framework.auth import AuthenticationService
 from src.framework.email import EmailService
 from src.framework.csrf import CSRFProtection, add_csrf_middleware
 from src.framework.security import add_security_middleware, create_security_config
-from src.framework.routes import create_auth_routes, create_main_routes, create_dev_routes, create_2fa_routes, create_performance_routes
+from src.framework.routes import create_auth_routes, create_main_routes, create_dev_routes, create_2fa_routes, create_performance_routes, create_monitoring_routes
 from src.framework.routes.audit_routes import create_audit_routes
 from src.framework.audit import get_audit_service
 from src.framework.performance_config import init_performance
@@ -85,6 +85,9 @@ def create_app():
     # Register performance monitoring routes (development mode)
     if settings.enable_performance_optimization:
         create_performance_routes(app, db, auth_service, csrf_protection)
+    
+    # Register enhanced monitoring routes
+    create_monitoring_routes(app, db, auth_service, csrf_protection)
     
     # Mount static files
     app.mount("/static", StaticFiles(directory="static"), name="static")

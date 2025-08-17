@@ -4,7 +4,7 @@
 
 This document provides comprehensive documentation for all API endpoints in the PY-Framework.
 
-**✅ LATEST UPDATE**: Enhanced with performance monitoring endpoints, audit logging APIs, and database constraint fixes.
+**✅ LATEST UPDATE**: Enhanced monitoring system with Prometheus metrics, health checks, intelligent alerting, and monitoring routes.
 
 ## Base URL
 
@@ -662,6 +662,215 @@ csrf_token: string (required) - CSRF protection token
 - Tokens are valid for 60 minutes by default
 - Tokens are session-bound for security
 - Failed CSRF validation returns 403 Forbidden
+
+## Enhanced Monitoring Endpoints ✅ LATEST
+
+### System Monitoring Dashboard
+
+#### `GET /admin/monitoring`
+**Description**: Comprehensive monitoring dashboard with Prometheus metrics, health checks, and alerting
+**Authentication**: Session required
+**Role Requirements**: Administrator (role_id = 0)
+**Response**: HTML monitoring dashboard with system metrics, health status, and alert management
+
+**Features**:
+- Real-time system metrics display
+- Health check status monitoring
+- Active alerts and alert history
+- Performance insights and recommendations
+- Prometheus metrics visualization
+- Grafana dashboard configuration export
+
+### Metrics Endpoints
+
+#### `GET /api/metrics`
+**Description**: Prometheus-formatted metrics endpoint for monitoring systems
+**Authentication**: None required (for monitoring tools)
+**Response**: Prometheus metrics format
+
+**Metrics Included**:
+- HTTP request metrics (counts, duration, errors)
+- Database query metrics (duration, types, success rates)
+- System metrics (memory, CPU, disk usage)
+- Cache metrics (hit rates, operations)
+- Authentication metrics (login attempts, failures)
+
+#### `GET /api/metrics/summary`
+**Description**: JSON metrics summary for dashboard display
+**Authentication**: Session required
+**Role Requirements**: Administrator (role_id = 0)
+**Response** (JSON):
+```json
+{
+  "http_requests_total": {"value": 1523, "type": "counter"},
+  "http_request_duration_seconds": {"value": 0.045, "type": "histogram"},
+  "database_query_duration_seconds": {"value": 0.012, "type": "histogram"},
+  "cache_hits_total": {"value": 856, "type": "counter"},
+  "memory_usage_bytes": {"value": 104857600, "type": "gauge"}
+}
+```
+
+#### `GET /api/metrics/performance`
+**Description**: Performance insights and recommendations
+**Authentication**: Session required
+**Role Requirements**: Administrator (role_id = 0)
+**Response** (JSON):
+```json
+{
+  "health_score": 85,
+  "alerts": [
+    {
+      "type": "warning",
+      "message": "High memory usage detected",
+      "recommendation": "Consider optimizing memory usage"
+    }
+  ],
+  "recommendations": [
+    {
+      "category": "database",
+      "message": "Add index on frequently queried columns"
+    }
+  ]
+}
+```
+
+### Health Check Endpoints
+
+#### `GET /api/health`
+**Description**: Comprehensive health check endpoint with status codes
+**Authentication**: None required (for monitoring tools)
+**Response** (JSON):
+```json
+{
+  "status": "healthy",
+  "message": "All systems operational",
+  "checks": {
+    "database": {
+      "status": "healthy",
+      "message": "Database healthy (12ms)",
+      "details": {
+        "query_duration_ms": 12.3,
+        "connection_successful": true
+      }
+    },
+    "memory": {
+      "status": "healthy", 
+      "message": "Memory usage normal: 65.2%",
+      "details": {
+        "percent_used": 65.2,
+        "available_gb": 2.8
+      }
+    }
+  },
+  "summary": {
+    "total": 7,
+    "healthy": 6,
+    "warning": 1,
+    "critical": 0
+  }
+}
+```
+
+**Status Codes**:
+- `200 OK`: All systems healthy or minor warnings
+- `503 Service Unavailable`: Critical health issues detected
+
+#### `GET /api/health/{check_name}`
+**Description**: Individual health check result
+**Authentication**: None required (for monitoring tools)
+
+**URL Parameters**:
+```
+check_name: string (required) - Health check name (database, memory, disk_space, cpu, cache, sessions)
+```
+
+**Response**: Individual health check status with same format as above
+
+#### `POST /api/health/{check_name}/run`
+**Description**: Run specific health check immediately
+**Authentication**: Session required
+**Role Requirements**: Administrator (role_id = 0)
+
+**Response**: Immediate health check result with execution details
+
+### Alerting Endpoints
+
+#### `GET /api/alerts`
+**Description**: Get active alerts
+**Authentication**: Session required
+**Role Requirements**: Administrator (role_id = 0)
+**Response** (JSON):
+```json
+{
+  "alerts": [
+    {
+      "id": "high_memory_usage_123",
+      "rule_name": "high_memory_usage",
+      "severity": "warning",
+      "status": "active",
+      "message": "High memory usage detected",
+      "created_at": "2024-01-01T12:00:00Z",
+      "details": {
+        "current_memory_percent": 87.5
+      }
+    }
+  ]
+}
+```
+
+#### `GET /api/alerts/history`
+**Description**: Get alert history with optional limit
+**Authentication**: Session required
+**Role Requirements**: Administrator (role_id = 0)
+
+**Query Parameters**:
+```
+limit: integer (optional, default=100) - Number of alerts to return
+```
+
+#### `GET /api/alerts/stats`
+**Description**: Get alerting statistics
+**Authentication**: Session required
+**Role Requirements**: Administrator (role_id = 0)
+**Response** (JSON):
+```json
+{
+  "total_alerts": 45,
+  "active_alerts": 2,
+  "recent_alerts_24h": 8,
+  "severity_breakdown": {
+    "info": 5,
+    "warning": 25,
+    "critical": 15
+  },
+  "rules_enabled": 6,
+  "rules_total": 8
+}
+```
+
+### Monitoring Configuration
+
+#### `GET /admin/monitoring/grafana`
+**Description**: Download Grafana dashboard configuration
+**Authentication**: Session required
+**Role Requirements**: Administrator (role_id = 0)
+**Response**: JSON file download with Grafana dashboard configuration
+
+**File**: `py-framework-dashboard.json`
+
+#### `GET /admin/monitoring/export`
+**Description**: Export comprehensive monitoring data
+**Authentication**: Session required
+**Role Requirements**: Administrator (role_id = 0)
+**Response**: JSON file download with complete monitoring data
+
+**Export Includes**:
+- Metrics summary and performance insights
+- Health status for all checks
+- Active alerts and alert history
+- Alert statistics and trends
+
+**File**: `monitoring-export-YYYYMMDD-HHMMSS.json`
 
 ## Admin Audit & Performance Endpoints ✅ NEW
 

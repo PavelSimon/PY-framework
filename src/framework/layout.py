@@ -75,6 +75,7 @@ def create_sidebar(menu_items: List[Dict] = None, current_page: str = ""):
             {"title": "Admin", "items": [
                 {"name": "Audit Logs", "url": "/admin/audit", "icon": "📋"},
                 {"name": "Performance", "url": "/admin/performance", "icon": "⚡"},
+                {"name": "Monitoring", "url": "/admin/monitoring", "icon": "🔍"},
             ]},
             {"title": "Development", "items": [
                 {"name": "Test Email", "url": "/dev/test-email", "icon": "📧"},

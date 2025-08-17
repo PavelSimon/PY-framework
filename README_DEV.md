@@ -38,6 +38,9 @@ uv run python dev_simple.py
 - **Pavel's Admin Account**: Pavel@pavel-simon.com / <your_password>
 - **Audit Dashboard**: http://localhost:8000/admin/audit ✅ NEW
 - **Performance Dashboard**: http://localhost:8000/admin/performance ✅ NEW
+- **Monitoring Dashboard**: http://localhost:8000/admin/monitoring ✅ LATEST
+- **Health Check API**: http://localhost:8000/api/health ✅ LATEST
+- **Metrics API**: http://localhost:8000/api/metrics ✅ LATEST
 - **Development Tools**: http://localhost:8000/dev/
 
 ## Available Admin Accounts
