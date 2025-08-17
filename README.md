@@ -1,6 +1,6 @@
 # PY-Framework
 
-A secure, robust FastHTML and DuckDB-based web framework with state-of-the-art authentication, minimal JavaScript, wannabe enterprise-grade security, OAuth integration, and two-factor authentication support.
+A secure, robust FastHTML and DuckDB-based web framework with state-of-the-art authentication, minimal JavaScript, *wannabe* enterprise-grade security, OAuth integration, and two-factor authentication support.
 Created with full support for Claude Code.
 
 ## 🚀 Features
