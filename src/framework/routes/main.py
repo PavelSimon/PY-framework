@@ -5,6 +5,7 @@ Main application route handlers for PY-Framework
 from fasthtml.common import *
 from ..layout import create_app_layout, create_auth_layout, create_page_title, create_success_message, create_error_message
 from ..session import get_current_user
+from ..auth.totp import TwoFactorAuthentication, TOTPService
 
 
 def create_main_routes(app, db=None, auth_service=None, is_development=False, csrf_protection=None):
@@ -192,13 +193,52 @@ def create_main_routes(app, db=None, auth_service=None, is_development=False, cs
             A("Change Password", href="/profile/change-password", cls="btn btn-secondary")
         ])
         
+        # Get 2FA status for the user
+        two_fa = TwoFactorAuthentication(db)
+        totp_service = TOTPService(db)
+        status = two_fa.get_2fa_status(user["id"])
+        is_2fa_enabled = status["enabled"]
+        backup_codes_count = status["backup_codes_remaining"]
+        
+        # Create 2FA section
+        if is_2fa_enabled:
+            two_fa_section = Div(
+                H3("🔐 Two-Factor Authentication"),
+                Div(
+                    P("✅ 2FA is enabled for your account", cls="text-success"),
+                    P(f"Backup codes remaining: {backup_codes_count}"),
+                    Div(
+                        A("Manage 2FA Settings", href="/profile/2fa", cls="btn btn-primary"),
+                        A("Regenerate Backup Codes", href="/profile/2fa/backup-codes", cls="btn btn-secondary") if backup_codes_count < 8 else None,
+                        cls="button-group"
+                    ),
+                    cls="alert alert-success"
+                ),
+                style="margin-top: 2rem;"
+            )
+        else:
+            two_fa_section = Div(
+                H3("🔐 Two-Factor Authentication"),
+                Div(
+                    P("🔓 2FA is not enabled for your account", cls="text-warning"),
+                    P("Add an extra layer of security to your account with two-factor authentication."),
+                    Div(
+                        A("Enable 2FA", href="/profile/2fa", cls="btn btn-primary"),
+                        cls="button-group"
+                    ),
+                    cls="alert alert-warning"
+                ),
+                style="margin-top: 2rem;"
+            )
+        
         content = Div(
             Form(
                 *form_elements,
                 action="/profile",
                 method="post",
                 cls="form"
-            )
+            ),
+            two_fa_section
         )
         return Titled("Edit Profile", create_app_layout(
             content, 

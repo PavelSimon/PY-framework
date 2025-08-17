@@ -21,11 +21,11 @@ class Settings(BaseSettings):
     
     google_client_id: Optional[str] = None
     google_client_secret: Optional[str] = None
-    google_redirect_uri: str = "http://localhost:8000/auth/google/callback"
+    google_redirect_uri: str = "http://localhost:8000/auth/oauth/google/callback"
     
     github_client_id: Optional[str] = None
     github_client_secret: Optional[str] = None
-    github_redirect_uri: str = "http://localhost:8000/auth/github/callback"
+    github_redirect_uri: str = "http://localhost:8000/auth/oauth/github/callback"
     
     smtp_server: Optional[str] = None
     smtp_port: int = 587

@@ -49,8 +49,8 @@ def create_auth_routes(app, db, auth_service, email_service=None, csrf_protectio
                 Hr(),
                 P("Or sign in with:", style="text-align: center; margin: 1rem 0 0.5rem 0; color: #666;"),
                 Div(
-                    A("🔍 Sign in with Google", href="/auth/google", cls="btn btn-google", style="display: inline-block; margin-right: 0.5rem; padding: 0.5rem 1rem; background-color: #4285f4; color: white; text-decoration: none; border-radius: 4px;"),
-                    A("🐙 Sign in with GitHub", href="/auth/github", cls="btn btn-github", style="display: inline-block; padding: 0.5rem 1rem; background-color: #333; color: white; text-decoration: none; border-radius: 4px;"),
+                    A("🔍 Sign in with Google", href="/auth/oauth/google", cls="btn btn-google", style="display: inline-block; margin-right: 0.5rem; padding: 0.5rem 1rem; background-color: #4285f4; color: white; text-decoration: none; border-radius: 4px;"),
+                    A("🐙 Sign in with GitHub", href="/auth/oauth/github", cls="btn btn-github", style="display: inline-block; padding: 0.5rem 1rem; background-color: #333; color: white; text-decoration: none; border-radius: 4px;"),
                     style="text-align: center; margin-bottom: 1rem;"
                 ),
                 Hr(),
@@ -307,7 +307,25 @@ def create_auth_routes(app, db, auth_service, email_service=None, csrf_protectio
                     cls="container"
                 )
             
-            # Create session
+            # Check if 2FA is enabled for this user
+            from ..auth.totp import TOTPService
+            totp_service = TOTPService(db)
+            
+            if totp_service.is_2fa_enabled(user['id']):
+                # Create 2FA session token for verification flow
+                two_fa_token = totp_service.create_2fa_session_token(user['id'])
+                if not two_fa_token:
+                    return Div(
+                        H1("2FA Error"),
+                        P("Error creating 2FA session. Please try again.", cls="alert alert-danger"),
+                        P(A("Try again", href="/auth/login")),
+                        cls="container"
+                    )
+                
+                # Redirect to 2FA verification page
+                return RedirectResponse(f"/auth/2fa-verify?token={two_fa_token}", status_code=302)
+            
+            # Create session (only if 2FA is not required)
             session_id = auth_service.create_session(db, user['id'], client_ip, user_agent)
             
             # Store session temporarily for development
@@ -776,8 +794,18 @@ def create_auth_routes(app, db, auth_service, email_service=None, csrf_protectio
                 page_subtitle="An error occurred"
             ))
     
+    # Backward compatibility routes for OAuth (temporary)
+    @app.get("/auth/{provider}/callback")
+    def oauth_callback_legacy(provider: str, request):
+        """Legacy OAuth callback route - redirects to new route"""
+        query_string = str(request.url.query) if request.url.query else ""
+        new_url = f"/auth/oauth/{provider}/callback"
+        if query_string:
+            new_url += f"?{query_string}"
+        return RedirectResponse(new_url, status_code=301)
+    
     # OAuth Routes
-    @app.get("/auth/{provider}")
+    @app.get("/auth/oauth/{provider}")
     def oauth_login(provider: str):
         """Initiate OAuth login flow"""
         try:
@@ -832,7 +860,7 @@ def create_auth_routes(app, db, auth_service, email_service=None, csrf_protectio
                 page_subtitle="An error occurred"
             ))
     
-    @app.get("/auth/{provider}/callback")
+    @app.get("/auth/oauth/{provider}/callback")
     def oauth_callback(request, provider: str, code: str = None, state: str = None, error: str = None):
         """Handle OAuth callback"""
         try:
@@ -1107,5 +1135,184 @@ def create_auth_routes(app, db, auth_service, email_service=None, csrf_protectio
             return Titled("OAuth Error", create_auth_layout(
                 content,
                 page_title="OAuth Login Failed",
+                page_subtitle="An error occurred"
+            ))
+    
+    # Two-Factor Authentication Routes
+    @app.get("/auth/2fa-verify")
+    def two_factor_verify_page(request, token: str):
+        """2FA verification page"""
+        from ..auth.totp import TOTPService
+        totp_service = TOTPService(db)
+        
+        # Verify the 2FA session token (without consuming it)
+        user_id = totp_service.verify_2fa_session_token(token, consume=False)
+        if not user_id:
+            content = Div(
+                create_error_message("Invalid or expired 2FA session. Please log in again."),
+                P(A("Back to Login", href="/auth/login", cls="btn btn-primary"))
+            )
+            return Titled("2FA Session Expired", create_auth_layout(
+                content,
+                page_title="2FA Session Expired",
+                page_subtitle="Please log in again"
+            ))
+        
+        # Get user info
+        user = db.get_user_with_role(user_id)
+        if not user:
+            content = Div(
+                create_error_message("User not found. Please log in again."),
+                P(A("Back to Login", href="/auth/login", cls="btn btn-primary"))
+            )
+            return Titled("User Not Found", create_auth_layout(
+                content,
+                page_title="User Not Found",
+                page_subtitle="Please log in again"
+            ))
+        
+        # Create form with CSRF token
+        form_elements = [
+            Input(type="hidden", name="token", value=token),
+            Div(
+                Label("Verification Code:", fr="verification_code"),
+                Input(type="text", id="verification_code", name="verification_code", 
+                      required=True, maxlength="8", 
+                      placeholder="123456 or backup code",
+                      autocomplete="one-time-code",
+                      style="font-size: 1.2rem; text-align: center; letter-spacing: 0.1em;"),
+                Small("Enter the 6-digit code from your authenticator app or an 8-character backup code"),
+                cls="form-group"
+            )
+        ]
+        
+        # Add CSRF token if protection is enabled
+        if csrf_protection:
+            session_id = request.cookies.get('session_id')
+            form_elements.insert(1, csrf_protection.create_csrf_input(session_id))
+        
+        form_elements.append(Button("Verify & Login", type="submit", cls="btn btn-primary"))
+        
+        content = Div(
+            H2("🔐 Two-Factor Authentication"),
+            
+            Div(
+                P(f"Welcome back, {user['first_name'] or user['email']}!"),
+                P("Please enter your verification code to complete login."),
+                cls="auth-welcome"
+            ),
+            
+            Form(
+                *form_elements,
+                action="/auth/2fa-verify",
+                method="post",
+                cls="form",
+                style="max-width: 400px; margin: 0 auto;"
+            ),
+            
+            Div(
+                H4("📱 Using Authenticator App"),
+                P("Open your authenticator app (Google Authenticator, Authy, etc.) and enter the 6-digit code."),
+                
+                H4("🆘 Lost Your Device?"),
+                P("Use one of your 8-character backup codes instead of the authenticator code."),
+                
+                style="margin-top: 2rem; padding: 1rem; border: 1px solid #dee2e6; border-radius: 4px; background-color: #f8f9fa;"
+            ),
+            
+            P(A("← Back to Login", href="/auth/login", cls="btn btn-secondary"))
+        )
+        
+        return Titled("Two-Factor Authentication", create_auth_layout(
+            content,
+            page_title="Two-Factor Authentication",
+            page_subtitle="Enter your verification code"
+        ))
+    
+    @app.post("/auth/2fa-verify")
+    def two_factor_verify(request, token: str, verification_code: str, csrf_token: str = None):
+        """Process 2FA verification"""
+        try:
+            # Validate CSRF token if protection is enabled
+            if csrf_protection:
+                session_id = request.cookies.get('session_id')
+                if not csrf_protection.validate_token(csrf_token, session_id):
+                    content = Div(
+                        create_error_message("Invalid security token. Please try again."),
+                        P(A("Back to 2FA", href=f"/auth/2fa-verify?token={token}", cls="btn btn-primary"))
+                    )
+                    return Titled("Security Error", create_auth_layout(
+                        content,
+                        page_title="Security Error",
+                        page_subtitle="Invalid security token"
+                    ))
+            
+            from ..auth.totp import TOTPService, TwoFactorAuthentication
+            totp_service = TOTPService(db)
+            two_fa = TwoFactorAuthentication(db)
+            
+            # Verify the 2FA session token (without consuming it)
+            user_id = totp_service.verify_2fa_session_token(token, consume=False)
+            if not user_id:
+                content = Div(
+                    create_error_message("Invalid or expired 2FA session. Please log in again."),
+                    P(A("Back to Login", href="/auth/login", cls="btn btn-primary"))
+                )
+                return Titled("2FA Session Expired", create_auth_layout(
+                    content,
+                    page_title="2FA Session Expired",
+                    page_subtitle="Please log in again"
+                ))
+            
+            # Verify the 2FA code
+            if not two_fa.verify_2fa(user_id, verification_code):
+                content = Div(
+                    create_error_message("Invalid verification code. Please check your authenticator app or try a backup code."),
+                    P(A("Try Again", href=f"/auth/2fa-verify?token={token}", cls="btn btn-primary"))
+                )
+                return Titled("Invalid Code", create_auth_layout(
+                    content,
+                    page_title="Invalid Verification Code",
+                    page_subtitle="Please try again"
+                ))
+            
+            # 2FA verification successful - now consume the token
+            totp_service.consume_2fa_session_token(token)
+            
+            # Get user info
+            user = db.get_user_with_role(user_id)
+            if not user:
+                content = Div(
+                    create_error_message("User not found. Please log in again."),
+                    P(A("Back to Login", href="/auth/login", cls="btn btn-primary"))
+                )
+                return Titled("User Not Found", create_auth_layout(
+                    content,
+                    page_title="User Not Found",
+                    page_subtitle="Please log in again"
+                ))
+            
+            # Create session after successful 2FA verification
+            client_ip = request.client.host if hasattr(request, 'client') else None
+            user_agent = request.headers.get('user-agent', '')
+            
+            session_id = auth_service.create_session(db, user['id'], client_ip, user_agent)
+            store_session(session_id, user['id'])
+            
+            # Update login timestamp
+            db.update_user_login(user['id'], reset_failed_attempts=True)
+            
+            # Redirect to dashboard
+            return RedirectResponse("/dashboard", status_code=302)
+            
+        except Exception as e:
+            print(f"2FA verification error: {e}")
+            content = Div(
+                create_error_message("An error occurred during 2FA verification. Please try again."),
+                P(A("Try Again", href=f"/auth/2fa-verify?token={token}", cls="btn btn-primary"))
+            )
+            return Titled("2FA Error", create_auth_layout(
+                content,
+                page_title="2FA Verification Error",
                 page_subtitle="An error occurred"
             ))

@@ -219,7 +219,7 @@ class TOTPService:
             print(f"Error creating 2FA session token: {e}")
             return None
     
-    def verify_2fa_session_token(self, token: str) -> Optional[int]:
+    def verify_2fa_session_token(self, token: str, consume: bool = True) -> Optional[int]:
         """Verify 2FA session token and return user_id"""
         if not token:
             return None
@@ -234,10 +234,11 @@ class TOTPService:
             if row:
                 user_id = row[0]
                 
-                # Clean up the used token
-                self.db.conn.execute("""
-                    DELETE FROM two_factor_tokens WHERE token = ?
-                """, [token])
+                # Clean up the used token only if consume=True
+                if consume:
+                    self.db.conn.execute("""
+                        DELETE FROM two_factor_tokens WHERE token = ?
+                    """, [token])
                 
                 return user_id
             
@@ -245,6 +246,20 @@ class TOTPService:
         except Exception as e:
             print(f"Error verifying 2FA session token: {e}")
             return None
+    
+    def consume_2fa_session_token(self, token: str) -> bool:
+        """Consume/delete a 2FA session token after successful verification"""
+        if not token:
+            return False
+        
+        try:
+            self.db.conn.execute("""
+                DELETE FROM two_factor_tokens WHERE token = ?
+            """, [token])
+            return True
+        except Exception as e:
+            print(f"Error consuming 2FA session token: {e}")
+            return False
     
     def cleanup_expired_tokens(self):
         """Clean up expired 2FA session tokens"""

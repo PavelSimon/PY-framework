@@ -344,31 +344,204 @@ csrf_token: string (required if CSRF enabled) - CSRF protection token
 **Authentication**: None required (development only)
 **Response**: Database tables and data overview
 
-## OAuth Endpoints (In Development)
+## OAuth Endpoints ✅ IMPLEMENTED
 
 ### Google OAuth
 
-#### `GET /auth/google`
-**Description**: Initiate Google OAuth flow
+#### `GET /auth/oauth/google`
+**Description**: Initiate Google OAuth flow with state validation
 **Authentication**: None required
-**Response**: Redirect to Google OAuth
+**Response**: Redirect to Google OAuth consent screen
 
-#### `GET /auth/google/callback`
-**Description**: Handle Google OAuth callback
-**Authentication**: OAuth flow
-**Response**: Login success or error
+**Security Features**:
+- CSRF state token validation
+- Session tracking for OAuth flow
+- Automatic cleanup of expired state tokens
+
+#### `GET /auth/oauth/google/callback`
+**Description**: Handle Google OAuth callback and create/link user account
+**Authentication**: OAuth flow with state validation
+**Response**: Login success with session creation or error page
+
+**Query Parameters**:
+```
+code: string (required) - OAuth authorization code from Google
+state: string (required) - CSRF protection state token
+```
+
+**Functionality**:
+- Validates OAuth state token
+- Exchanges code for access token
+- Retrieves user profile information
+- Links to existing account if email matches
+- Creates new account if no existing user found
+- Establishes authenticated session
 
 ### GitHub OAuth
 
-#### `GET /auth/github`
-**Description**: Initiate GitHub OAuth flow
+#### `GET /auth/oauth/github`
+**Description**: Initiate GitHub OAuth flow with state validation
 **Authentication**: None required
-**Response**: Redirect to GitHub OAuth
+**Response**: Redirect to GitHub OAuth consent screen
 
-#### `GET /auth/github/callback`
-**Description**: Handle GitHub OAuth callback
-**Authentication**: OAuth flow
-**Response**: Login success or error
+**Security Features**:
+- CSRF state token validation
+- Session tracking for OAuth flow
+- Automatic cleanup of expired state tokens
+
+#### `GET /auth/oauth/github/callback`
+**Description**: Handle GitHub OAuth callback and create/link user account
+**Authentication**: OAuth flow with state validation
+**Response**: Login success with session creation or error page
+
+**Query Parameters**:
+```
+code: string (required) - OAuth authorization code from GitHub
+state: string (required) - CSRF protection state token
+```
+
+**Functionality**:
+- Validates OAuth state token
+- Exchanges code for access token
+- Retrieves user profile and primary email
+- Links to existing account if email matches
+- Creates new account if no existing user found
+- Establishes authenticated session
+
+## Two-Factor Authentication Endpoints ✅ NEW
+
+### 2FA Management
+
+#### `GET /profile/2fa`
+**Description**: Display 2FA settings and management page
+**Authentication**: Session required
+**Response**: HTML page with 2FA status and management options
+
+**Features**:
+- Shows current 2FA status (enabled/disabled)
+- Displays remaining backup codes count
+- Provides setup instructions if 2FA not enabled
+- Management options if 2FA is enabled
+
+#### `GET /profile/2fa/setup`
+**Description**: Display 2FA setup page with QR code
+**Authentication**: Session required
+**Response**: HTML page with QR code and setup instructions
+
+**Features**:
+- Generates TOTP secret key
+- Creates QR code for mobile app setup
+- Provides manual entry option
+- Setup verification form
+
+#### `POST /profile/2fa/setup`
+**Description**: Confirm 2FA setup with verification code
+**Authentication**: Session required
+
+**Request Body** (form data):
+```
+secret: string (required) - TOTP secret key
+verification_code: string (required) - 6-digit TOTP code
+csrf_token: string (required) - CSRF protection token
+```
+
+**Response**:
+- Success: 2FA enabled with backup codes display
+- Error: Invalid verification code or setup failure
+
+**Features**:
+- Verifies TOTP code against secret
+- Enables 2FA for user account
+- Generates 8 backup recovery codes
+- Provides code display and copy functionality
+
+#### `GET /profile/2fa/backup-codes`
+**Description**: Display backup code regeneration page
+**Authentication**: Session required
+**Role Requirements**: User must have 2FA enabled
+**Response**: HTML form to regenerate backup codes
+
+#### `POST /profile/2fa/backup-codes`
+**Description**: Generate new backup codes (invalidates old ones)
+**Authentication**: Session required
+**Role Requirements**: User must have 2FA enabled
+
+**Request Body** (form data):
+```
+csrf_token: string (required) - CSRF protection token
+```
+
+**Response**:
+- Success: New backup codes display
+- Error: Backup code generation failure
+
+**Features**:
+- Invalidates all existing backup codes
+- Generates 8 new backup codes
+- Provides code display and copy functionality
+
+#### `GET /profile/2fa/disable`
+**Description**: Display 2FA disable confirmation page
+**Authentication**: Session required
+**Role Requirements**: User must have 2FA enabled
+**Response**: HTML form to disable 2FA
+
+#### `POST /profile/2fa/disable`
+**Description**: Disable 2FA after verification
+**Authentication**: Session required
+**Role Requirements**: User must have 2FA enabled
+
+**Request Body** (form data):
+```
+password: string (required) - User's current password
+verification_code: string (required) - TOTP code or backup code
+csrf_token: string (required) - CSRF protection token
+```
+
+**Response**:
+- Success: 2FA disabled confirmation
+- Error: Invalid password or verification code
+
+**Features**:
+- Requires password confirmation
+- Accepts TOTP code or backup code for verification
+- Completely removes 2FA setup and backup codes
+- Security warning about reduced account protection
+
+### 2FA Login Flow
+
+#### `GET /auth/2fa-verify`
+**Description**: Display 2FA verification page during login
+**Authentication**: 2FA session token required
+**Response**: HTML form for 2FA code entry
+
+**Features**:
+- Requires valid 2FA session token
+- Provides TOTP code input
+- Option to use backup code
+- Instructions for authenticator apps
+
+#### `POST /auth/2fa-verify`
+**Description**: Process 2FA verification code and complete login
+**Authentication**: 2FA session token required
+
+**Request Body** (form data):
+```
+token: string (required) - 2FA session token
+verification_code: string (required) - TOTP code or backup code
+csrf_token: string (required) - CSRF protection token
+```
+
+**Response**:
+- Success: Login completed with session creation and dashboard redirect
+- Error: Invalid verification code or token
+
+**Features**:
+- Validates 2FA session token
+- Accepts TOTP codes or backup codes
+- Tracks backup code usage
+- Creates authenticated session on success
+- Automatic redirect to dashboard
 
 ## Rate Limiting
 

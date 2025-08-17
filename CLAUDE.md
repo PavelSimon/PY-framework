@@ -4,9 +4,11 @@
 
 This is a **secure, robust FastHTML and DuckDB-based web framework** designed for future projects. It provides state-of-the-art authentication with minimal JavaScript, built-in OAuth support, and enterprise-grade security features.
 
-### ✅ Recent Updates (Route Architecture Refactoring)
+### ✅ Recent Updates (Production-Ready Security Framework)
+- **OAuth Integration**: Complete Google and GitHub OAuth implementation ✅ NEW
+- **Two-Factor Authentication**: Full TOTP 2FA with QR codes and backup codes ✅ NEW
+- **Advanced Security**: Enhanced middleware with rate limiting and comprehensive testing ✅ NEW
 - **Modular Route Organization**: All routes moved to `src/framework/routes/` modules
-- **Lightweight Servers**: `dev.py` and `app.py` now focus on configuration and middleware
 - **Professional Navigation**: 3-tier navigation system with responsive design
 - **Email Service**: Complete email verification and testing system
 - **Development Tools**: Built-in testing tools for email and authentication
@@ -20,6 +22,8 @@ This is a **secure, robust FastHTML and DuckDB-based web framework** designed fo
 - **BCrypt**: Password hashing and security
 - **Python-JOSE**: JWT token handling
 - **HTTPX**: HTTP client for OAuth integrations
+- **PyOTP**: TOTP-based two-factor authentication ✅ NEW
+- **QRCode**: QR code generation for 2FA setup ✅ NEW
 
 ### Project Structure
 ```
@@ -28,22 +32,30 @@ PY-framework/
 │   ├── __init__.py               # Framework package
 │   ├── config.py                 # Configuration management
 │   ├── layout.py                 # Layout components & navigation
-│   ├── auth/                     # Authentication system
+│   ├── auth/                     # Authentication system ✅ COMPLETE
 │   │   ├── __init__.py
-│   │   └── auth.py               # Core auth logic
+│   │   ├── auth.py               # Core auth logic
+│   │   └── totp.py               # Two-factor authentication ✅ NEW
 │   ├── database/                 # Database operations
 │   │   ├── __init__.py
 │   │   └── database.py           # Database schema & operations
-│   ├── email/                    # Email services ✅ IMPLEMENTED
+│   ├── email/                    # Email services ✅ COMPLETE
 │   │   ├── __init__.py
 │   │   └── email_service.py      # Email verification & notifications
-│   ├── routes/                   # Route handlers ✅ NEW ARCHITECTURE
+│   ├── oauth/                    # OAuth integrations ✅ COMPLETE
+│   │   ├── __init__.py
+│   │   ├── oauth_service.py      # OAuth service management
+│   │   ├── google_provider.py    # Google OAuth provider
+│   │   └── github_provider.py    # GitHub OAuth provider
+│   ├── routes/                   # Route handlers ✅ COMPLETE
 │   │   ├── __init__.py
 │   │   ├── auth.py               # Authentication routes
 │   │   ├── main.py               # Main application routes
-│   │   └── dev.py                # Development-only routes
-│   └── oauth/                    # OAuth integrations (planned)
-│       └── __init__.py
+│   │   ├── dev.py                # Development-only routes
+│   │   └── two_factor.py         # 2FA management routes ✅ NEW
+│   ├── csrf.py                   # CSRF protection ✅ COMPLETE
+│   ├── security.py               # Security middleware ✅ COMPLETE
+│   └── session.py                # Session management ✅ COMPLETE
 ├── templates/                    # HTML templates
 ├── static/                       # Static assets
 │   ├── css/                     # Stylesheets
@@ -77,11 +89,22 @@ PY-framework/
 - **Admin Actions**: User role editing, account status management, session monitoring
 - **Self-Protection**: Admins cannot modify their own accounts for security
 
-### OAuth Integration
-- **Google OAuth**: Secure Google Sign-In integration (planned)
-- **GitHub OAuth**: GitHub authentication support (planned)
-- **State Validation**: CSRF protection for OAuth flows
-- **Token Management**: Secure storage and handling of OAuth tokens
+### OAuth Integration ✅ COMPLETE
+- **Google OAuth**: Secure Google Sign-In integration with full user profile access
+- **GitHub OAuth**: GitHub authentication with email and profile support
+- **Account Linking**: Automatic linking for existing users with matching emails
+- **State Validation**: CSRF protection for OAuth flows with time-based expiry
+- **Token Management**: Secure storage and handling of access/refresh tokens
+- **Provider Management**: Extensible provider system for additional OAuth services
+
+### Two-Factor Authentication (2FA) ✅ NEW
+- **TOTP Support**: Time-based One-Time Password using industry standards
+- **QR Code Setup**: Easy mobile app setup with QR code generation
+- **Backup Codes**: 8 single-use recovery codes for device loss scenarios
+- **Session Management**: Secure 2FA verification flow with temporary tokens
+- **Multiple Providers**: Support for Google Authenticator, Authy, Microsoft Authenticator
+- **Admin Controls**: Users can enable/disable 2FA and regenerate backup codes
+- **Login Integration**: Seamless integration with existing authentication flow
 
 ### Security Headers & Protection
 - **CSRF Protection**: Built-in CSRF token validation
@@ -152,9 +175,40 @@ sessions (
 )
 ```
 
+### Two-Factor Authentication Tables ✅ NEW
+```sql
+totp_secrets (
+    id INTEGER PRIMARY KEY,
+    user_id INTEGER NOT NULL,
+    secret VARCHAR NOT NULL,
+    enabled BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+)
+
+backup_codes (
+    id INTEGER PRIMARY KEY,
+    user_id INTEGER NOT NULL,
+    code_hash VARCHAR NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    used_at TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+)
+
+two_factor_tokens (
+    id INTEGER PRIMARY KEY,
+    user_id INTEGER NOT NULL,
+    token VARCHAR UNIQUE NOT NULL,
+    expires_at TIMESTAMP NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+)
+```
+
 ### Security Token Tables
 - `email_verification_tokens`: Email verification tokens
 - `password_reset_tokens`: Password reset tokens
+- `oauth_state_tokens`: OAuth CSRF state validation tokens
 
 ## 🚀 Implementation Roadmap
 
@@ -184,22 +238,28 @@ sessions (
 - [x] Session monitoring and management
 - [x] Comprehensive role-based testing
 
-### Phase 4: OAuth Integration
-- [ ] Google OAuth implementation
-- [ ] GitHub OAuth implementation
-- [ ] OAuth callback handling
-- [ ] Account linking for existing users
+### Phase 4: OAuth Integration ✅ (COMPLETED)
+- [x] Google OAuth implementation
+- [x] GitHub OAuth implementation
+- [x] OAuth callback handling
+- [x] Account linking for existing users
+- [x] OAuth state token validation
+- [x] Comprehensive OAuth testing
 
-### Phase 5: Advanced Features
+### Phase 5: Advanced Security Features ✅ (COMPLETED)
 - [x] User profile management
 - [x] Advanced security logging
 - [x] Email templates and notifications
 - [x] Admin dashboard and user management
-- [ ] Two-factor authentication (2FA)
-- [ ] Advanced audit logging
+- [x] Two-factor authentication (2FA) with TOTP
+- [x] QR code generation for 2FA setup
+- [x] Backup codes for account recovery
+- [x] 2FA integration with login flow
+- [x] Comprehensive 2FA testing
 
-### Phase 5: Production Ready
-- [ ] Comprehensive testing suite
+### Phase 6: Production Ready (IN PROGRESS)
+- [x] Comprehensive testing suite (127 tests passing)
+- [ ] Advanced audit logging system
 - [ ] Performance optimization
 - [ ] Docker containerization
 - [ ] Deployment documentation
@@ -387,11 +447,26 @@ The framework implements a clean, modular route architecture for better maintain
 - `GET /dev/test-auth` - Authentication system test page
 - `GET /dev/database` - Database inspector
 
-### Planned OAuth Routes (Future Implementation)
-- `GET /auth/google` - Google OAuth initiation
-- `GET /auth/google/callback` - Google OAuth callback
-- `GET /auth/github` - GitHub OAuth initiation
-- `GET /auth/github/callback` - GitHub OAuth callback
+### OAuth Routes ✅ IMPLEMENTED (`src/framework/routes/auth.py`)
+- `GET /auth/oauth/google` - Google OAuth initiation
+- `GET /auth/oauth/google/callback` - Google OAuth callback with user creation/linking
+- `GET /auth/oauth/github` - GitHub OAuth initiation  
+- `GET /auth/oauth/github/callback` - GitHub OAuth callback with user creation/linking
+- `GET /auth/forgot-password` - Password reset request page
+- `POST /auth/forgot-password` - Send password reset email
+- `GET /auth/reset-password/{token}` - Password reset form
+- `POST /auth/reset-password` - Process password reset
+
+### Two-Factor Authentication Routes ✅ NEW (`src/framework/routes/two_factor.py`)
+- `GET /profile/2fa` - 2FA settings and management page
+- `GET /profile/2fa/setup` - 2FA setup page with QR code
+- `POST /profile/2fa/setup` - Confirm 2FA setup with verification code
+- `GET /profile/2fa/backup-codes` - Regenerate backup codes page
+- `POST /profile/2fa/backup-codes` - Generate new backup codes
+- `GET /profile/2fa/disable` - Disable 2FA confirmation page
+- `POST /profile/2fa/disable` - Disable 2FA after verification
+- `GET /auth/2fa-verify` - 2FA verification during login
+- `POST /auth/2fa-verify` - Process 2FA verification code
 
 ## 🔒 Security Considerations
 
@@ -543,21 +618,43 @@ CMD ["python", "app.py"]
     - Professional responsive grid layout with hover effects
     - Quick access links to profile editing and password management
 
+12. **OAuth Integration** ✅ NEW - Complete OAuth authentication system
+    - Google OAuth with full profile and email access
+    - GitHub OAuth with primary email detection
+    - Automatic account linking for existing users with matching emails
+    - OAuth state token validation for CSRF protection
+    - Secure token storage with expiration handling
+    - Extensible provider system for future OAuth services
+    - Comprehensive test coverage (24/24 OAuth tests passing)
+
+13. **Two-Factor Authentication (2FA)** ✅ NEW - Enterprise-grade TOTP implementation
+    - TOTP-based 2FA using industry-standard algorithms
+    - QR code generation for easy mobile app setup
+    - Support for Google Authenticator, Authy, Microsoft Authenticator, 1Password
+    - 8 single-use backup codes for account recovery
+    - Secure 2FA session tokens for verification flow
+    - Complete user interface for 2FA management
+    - Seamless integration with existing login flow
+    - Regenerate backup codes and disable 2FA options
+    - Comprehensive test coverage (13/13 2FA tests passing)
+
 ### 🔄 NEXT DEVELOPMENT STEPS
-1. **OAuth Integration** - Google and GitHub OAuth providers
-2. **Two-Factor Authentication** - Enhanced account security  
-3. **Advanced Audit Logging** - Comprehensive security event tracking
-4. **Production Deploy** - Docker, monitoring, and deployment guides
-5. **Performance Optimization** - Caching and database optimization
+1. **Advanced Audit Logging** - Comprehensive security event tracking
+2. **Performance Optimization** - Caching and database optimization
+3. **Docker Containerization** - Production deployment containers
+4. **Deployment Documentation** - Production deployment guides
+5. **Monitoring and Logging** - Application performance monitoring
 
 ### 📊 TESTING STATUS
-- **Total Tests**: 87/87 passing ✅
+- **Total Tests**: 127/127 passing ✅
 - **Email Service**: 11/11 tests ✅
 - **Registration**: 7/7 tests ✅  
 - **Login System**: 11/11 tests ✅
 - **CSRF Protection**: 14/14 tests ✅
 - **Security Middleware**: 25/25 tests ✅
-- **Role-Based Access Control**: 19/19 tests ✅ NEW
+- **Role-Based Access Control**: 19/19 tests ✅
+- **OAuth Integration**: 24/24 tests ✅ NEW
+- **Two-Factor Authentication**: 13/13 tests ✅ NEW
 - **Navigation Layout**: Fully implemented and tested ✅
 - **Code Coverage**: Comprehensive test coverage for all core features
 

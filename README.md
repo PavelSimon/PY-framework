@@ -1,6 +1,6 @@
 # PY-Framework
 
-A secure, robust FastHTML and DuckDB-based web framework with state-of-the-art authentication, minimal JavaScript, enterprise-grade security, and OAuth integration support.
+A secure, robust FastHTML and DuckDB-based web framework with state-of-the-art authentication, minimal JavaScript, enterprise-grade security, OAuth integration, and two-factor authentication support.
 Created with full support for Claude Code.
 
 ## 🚀 Features
@@ -9,8 +9,10 @@ Created with full support for Claude Code.
 - **FastHTML**: Lightning-fast web framework with minimal JavaScript
 - **DuckDB**: High-performance embedded database with optimized schema
 - **Secure Authentication**: BCrypt password hashing (12 rounds), rate limiting, account lockout
-- **Role-Based Access Control**: Admin and user roles with comprehensive management ✅ NEW
-- **Admin Features**: User role assignment, account management, session monitoring ✅ NEW
+- **Role-Based Access Control**: Admin and user roles with comprehensive management
+- **Admin Features**: User role assignment, account management, session monitoring
+- **OAuth Integration**: Complete Google and GitHub OAuth implementation ✅ NEW
+- **Two-Factor Authentication**: Enterprise-grade TOTP with QR codes and backup codes ✅ NEW
 - **Email Verification**: Complete user registration with email confirmation system
 - **Session Management**: Secure session handling with automatic cleanup, tracking, and session-aware routing
 - **Password Security**: Advanced password validation with strength scoring and reset functionality
@@ -25,10 +27,10 @@ Created with full support for Claude Code.
 - **Modular Architecture**: Clean route organization with separation of concerns
 
 ### 🔄 IN DEVELOPMENT
-- **OAuth Integration**: Google and GitHub SSO support (database ready)
-- **Two-Factor Authentication**: Enhanced account security with TOTP
 - **Advanced Audit Logging**: Security event tracking and monitoring
 - **Performance Optimization**: Caching and database optimization
+- **Docker Containerization**: Production deployment containers
+- **Monitoring & Logging**: Application performance monitoring
 
 ### 📚 **Documentation Features**
 - **Integrated Documentation System**: Built-in `/docs` endpoint with markdown rendering
@@ -37,9 +39,9 @@ Created with full support for Claude Code.
 - **Comprehensive Coverage**: Security, API, deployment, and development guides
 
 ### 📊 TESTING STATUS
-- **87/87 tests passing** ✅
+- **127/127 tests passing** ✅
 - **100% core functionality tested**
-- **Complete test coverage**: Email service, registration, login, CSRF protection, security middleware, role-based access control
+- **Complete test coverage**: Email service, registration, login, CSRF protection, security middleware, role-based access control, OAuth integration, two-factor authentication
 
 ## 📋 Requirements
 
@@ -95,9 +97,10 @@ PY-framework/
 │   ├── email/              # Email services
 │   ├── oauth/              # OAuth integrations
 │   ├── routes/             # Route handlers (modular architecture)
-│   │   ├── auth.py         # Authentication routes
+│   │   ├── auth.py         # Authentication & OAuth routes
 │   │   ├── main.py         # Main application routes
-│   │   └── dev.py          # Development routes
+│   │   ├── dev.py          # Development routes
+│   │   └── two_factor.py   # 2FA management routes ✅ NEW
 │   ├── layout.py           # Layout components
 │   ├── config.py           # Configuration management
 │   ├── csrf.py             # CSRF protection
@@ -183,9 +186,10 @@ uv run pytest --cov=src/framework
 
 The framework uses a modular route architecture for better maintainability and scalability:
 
-- **`src/framework/routes/auth.py`** - Authentication routes (login, register, verify, logout)
+- **`src/framework/routes/auth.py`** - Authentication & OAuth routes (login, register, verify, logout, OAuth)
 - **`src/framework/routes/main.py`** - Main application routes (home, dashboard, profile)  
 - **`src/framework/routes/dev.py`** - Development-only routes (email test, database inspector)
+- **`src/framework/routes/two_factor.py`** - Two-factor authentication routes (2FA setup, verification, management) ✅ NEW
 
 ### Server Files
 
@@ -214,11 +218,22 @@ The framework uses a modular route architecture for better maintainability and s
 - `GET /auth/reset-password/{token}` - Reset password page
 - `POST /auth/reset-password` - Process password reset
 
-### OAuth Endpoints (In Development)
-- `GET /auth/google` - Google OAuth initiation
-- `GET /auth/google/callback` - Google OAuth callback
-- `GET /auth/github` - GitHub OAuth initiation
-- `GET /auth/github/callback` - GitHub OAuth callback
+### OAuth Endpoints ✅ IMPLEMENTED
+- `GET /auth/oauth/google` - Google OAuth initiation
+- `GET /auth/oauth/google/callback` - Google OAuth callback with user creation/linking
+- `GET /auth/oauth/github` - GitHub OAuth initiation
+- `GET /auth/oauth/github/callback` - GitHub OAuth callback with user creation/linking
+
+### Two-Factor Authentication Endpoints ✅ NEW
+- `GET /profile/2fa` - 2FA settings and management page
+- `GET /profile/2fa/setup` - 2FA setup page with QR code
+- `POST /profile/2fa/setup` - Confirm 2FA setup with verification code
+- `GET /profile/2fa/backup-codes` - Regenerate backup codes page
+- `POST /profile/2fa/backup-codes` - Generate new backup codes
+- `GET /profile/2fa/disable` - Disable 2FA confirmation page
+- `POST /profile/2fa/disable` - Disable 2FA after verification
+- `GET /auth/2fa-verify` - 2FA verification during login
+- `POST /auth/2fa-verify` - Process 2FA verification code
 
 ### Main Application Endpoints
 - `GET /` - Session-aware homepage (redirects to dashboard if logged in)
@@ -265,7 +280,7 @@ The framework uses a modular route architecture for better maintainability and s
 
 ✅ **Production-Ready Architecture**  
 - Modular route organization
-- Comprehensive test coverage (68/68 tests passing)
+- Comprehensive test coverage (127/127 tests passing)
 - Database optimization and indexing
 - Email service integration
 - Professional navigation layout
