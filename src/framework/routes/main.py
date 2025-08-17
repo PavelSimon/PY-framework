@@ -442,6 +442,12 @@ def create_main_routes(app, db=None, auth_service=None, is_development=False, cs
     
     @app.get("/docs")
     def docs_index(request):
+        # Check authentication first
+        user = get_current_user(request, db, auth_service)
+        
+        if not user:
+            return RedirectResponse("/auth/login", status_code=302)
+        
         # Redirect to overview doc by default
         return RedirectResponse("/docs/overview", status_code=302)
     
@@ -450,8 +456,11 @@ def create_main_routes(app, db=None, auth_service=None, is_development=False, cs
         import os
         import markdown
         
-        # Get current user for layout
+        # Check authentication first
         user = get_current_user(request, db, auth_service)
+        
+        if not user:
+            return RedirectResponse("/auth/login", status_code=302)
         
         # Map doc names to files
         doc_files = {
@@ -520,6 +529,186 @@ def create_main_routes(app, db=None, auth_service=None, is_development=False, cs
             page_title=doc_title,
             page_subtitle="PY-Framework Documentation",
             show_sidebar=False  # We'll use our own docs sidebar
+        ))
+    
+    @app.get("/settings")
+    def settings_page(request):
+        # Settings page - comprehensive user preferences and configuration
+        user = get_current_user(request, db, auth_service)
+        
+        if not user:
+            return RedirectResponse("/auth/login", status_code=302)
+        
+        # Get user's current settings and account info
+        user_sessions = []
+        try:
+            # Get active sessions for this user
+            cursor = db.conn.execute("""
+                SELECT id, created_at, ip_address, user_agent, is_active 
+                FROM sessions 
+                WHERE user_id = ? AND is_active = TRUE
+                ORDER BY created_at DESC
+                LIMIT 10
+            """, [user['id']])
+            user_sessions = cursor.fetchall()
+        except Exception as e:
+            print(f"Error fetching sessions: {e}")
+        
+        # Current session info
+        current_session_id = request.cookies.get('session_id')
+        
+        # Create settings sections
+        content = Div(
+            # Account Information Section
+            Div(
+                H2("👤 Account Information"),
+                Div(
+                    Div(
+                        H4("Personal Details"),
+                        P(f"📧 Email: {user['email']}"),
+                        P(f"👤 Name: {user['first_name'] or 'Not set'} {user['last_name'] or ''}"),
+                        P(f"✅ Email Verified: {'Yes' if user['is_verified'] else 'No'}"),
+                        P(f"📅 Member Since: {user['created_at'].strftime('%B %d, %Y') if user['created_at'] else 'Unknown'}"),
+                        P(f"🔄 Last Updated: {user['updated_at'].strftime('%B %d, %Y at %H:%M') if user['updated_at'] else 'Never'}"),
+                        cls="settings-card"
+                    ),
+                    Div(
+                        H4("Quick Actions"),
+                        Div(
+                            A("✏️ Edit Profile", href="/profile", cls="btn btn-primary"),
+                            A("🔒 Change Password", href="/profile/change-password", cls="btn btn-secondary"),
+                            cls="button-group"
+                        ),
+                        cls="settings-card"
+                    ),
+                    cls="settings-grid"
+                ),
+                cls="settings-section"
+            ),
+            
+            # Security Settings Section
+            Div(
+                H2("🔐 Security Settings"),
+                Div(
+                    Div(
+                        H4("Password Security"),
+                        P("✅ Strong password requirements enforced"),
+                        P("✅ BCrypt hashing with 12 rounds"),
+                        P("✅ Account lockout protection (5 failed attempts)"),
+                        P("✅ Session timeout: 24 hours"),
+                        Div(
+                            A("🔒 Change Password", href="/profile/change-password", cls="btn btn-outline"),
+                            A("🔑 Reset Password", href="/auth/forgot-password", cls="btn btn-outline"),
+                            cls="button-group"
+                        ),
+                        cls="settings-card"
+                    ),
+                    Div(
+                        H4("Account Protection"),
+                        P("✅ CSRF protection enabled on all forms"),
+                        P("✅ Rate limiting: 100 requests per hour"),
+                        P("✅ IP address tracking for sessions"),
+                        P("✅ Security headers enabled"),
+                        P("🔄 Two-Factor Authentication: Coming soon"),
+                        cls="settings-card"
+                    ),
+                    cls="settings-grid"
+                ),
+                cls="settings-section"
+            ),
+            
+            # Active Sessions Section
+            Div(
+                H2("📱 Active Sessions"),
+                Div(
+                    H4(f"Session Management ({len(user_sessions)} active sessions)"),
+                    P("Monitor and manage your active login sessions across different devices."),
+                    cls="settings-card-header"
+                ),
+                *[
+                    Div(
+                        Div(
+                            H5("🖥️ Session Details" if session[0] == current_session_id else "📱 Device Session"),
+                            P(f"Session ID: {session[0][:16]}..." if session[0] else "Unknown"),
+                            P(f"📅 Login Time: {session[1].strftime('%B %d, %Y at %H:%M') if session[1] else 'Unknown'}"),
+                            P(f"🌐 IP Address: {session[2] or 'Unknown'}"),
+                            P(f"💻 Device: {session[3][:50] + '...' if session[3] and len(session[3]) > 50 else session[3] or 'Unknown'}"),
+                            Small("✅ Current Session" if session[0] == current_session_id else "📱 Other Device", 
+                                  cls="session-indicator current" if session[0] == current_session_id else "session-indicator other"),
+                            cls="session-info"
+                        ),
+                        cls="session-card current-session" if session[0] == current_session_id else "session-card"
+                    )
+                    for session in user_sessions
+                ] if user_sessions else [
+                    Div(
+                        P("No active sessions found."),
+                        cls="settings-card"
+                    )
+                ],
+                cls="settings-section"
+            ),
+            
+            # Framework Information Section
+            Div(
+                H2("ℹ️ Framework Information"),
+                Div(
+                    Div(
+                        H4("PY-Framework Status"),
+                        P("🚀 Framework Version: 0.1.0"),
+                        P("✅ All systems operational"),
+                        P("🔒 Security features active"),
+                        P("📧 Email service configured"),
+                        P("🛡️ CSRF protection enabled"),
+                        P("⚡ Security middleware active"),
+                        cls="settings-card"
+                    ),
+                    Div(
+                        H4("Development Tools"),
+                        Div(
+                            A("📧 Test Email", href="/dev/test-email", cls="btn btn-outline") if is_development else None,
+                            A("🔍 Test Auth", href="/dev/test-auth", cls="btn btn-outline") if is_development else None,
+                            A("🗄️ Database", href="/dev/database", cls="btn btn-outline") if is_development else None,
+                            A("📚 Documentation", href="/docs", cls="btn btn-outline"),
+                            A("❤️ Health Check", href="/health", cls="btn btn-outline"),
+                            cls="button-group"
+                        ),
+                        cls="settings-card"
+                    ),
+                    cls="settings-grid"
+                ),
+                cls="settings-section"
+            ),
+            
+            # Danger Zone Section
+            Div(
+                H2("⚠️ Danger Zone"),
+                Div(
+                    Div(
+                        H4("Account Actions"),
+                        P("These actions cannot be undone. Please be careful."),
+                        Div(
+                            A("🚪 Logout All Sessions", href="/auth/logout-all", cls="btn btn-danger"),
+                            A("🗑️ Delete Account", href="/settings/delete-account", cls="btn btn-danger disabled", 
+                              title="Account deletion coming in future update"),
+                            cls="button-group"
+                        ),
+                        cls="danger-zone-card"
+                    ),
+                    cls="settings-grid"
+                ),
+                cls="settings-section"
+            ),
+            
+            cls="settings-container"
+        )
+        
+        return Titled("Settings", create_app_layout(
+            content, 
+            user=user, 
+            current_page="/settings",
+            page_title="Settings",
+            page_subtitle="Manage your account preferences and security settings"
         ))
     
     @app.get("/health")

@@ -236,16 +236,39 @@ csrf_token: string (required if CSRF enabled) - CSRF protection token
 **Authentication**: Session required
 **Response**: Sample page with navigation demonstration
 
+### Settings Management
+
+#### `GET /settings`
+**Description**: Comprehensive user settings and account management page
+**Authentication**: Session required
+**Response**: Settings page with multiple sections
+
+**Settings Sections**:
+- **Account Information**: Personal details, email verification status, member since date
+- **Security Settings**: Password security status, account protection features
+- **Active Sessions**: View and manage login sessions across devices
+- **Framework Information**: System status and development tools
+- **Danger Zone**: Account management actions (logout all sessions, delete account)
+
+**Features**:
+- Session management with current session highlighting
+- Quick access to profile editing and password change
+- Security feature status overview
+- Development tools access (in development mode)
+- Responsive grid layout with professional styling
+
 ### Documentation System
 
 #### `GET /docs`
 **Description**: Documentation system homepage
-**Authentication**: None required
-**Response**: 302 redirect to `/docs/overview`
+**Authentication**: Session required
+**Response**: 
+- **Authenticated**: 302 redirect to `/docs/overview`
+- **Unauthenticated**: 302 redirect to `/auth/login`
 
 #### `GET /docs/{doc_name}`
 **Description**: View specific documentation page with markdown rendering
-**Authentication**: None required
+**Authentication**: Session required
 
 **Parameters**:
 - `doc_name` (path): Documentation page name
@@ -258,8 +281,9 @@ csrf_token: string (required if CSRF enabled) - CSRF protection token
 - `specifications` - Development Specifications (CLAUDE.md)
 
 **Response**: 
-- Success: HTML page with markdown content rendered and navigation sidebar
-- Invalid doc_name: 302 redirect to `/docs/overview`
+- **Authenticated**: HTML page with markdown content rendered and navigation sidebar
+- **Unauthenticated**: 302 redirect to `/auth/login`
+- **Invalid doc_name**: 302 redirect to `/docs/overview`
 
 **Features**:
 - Responsive sidebar navigation

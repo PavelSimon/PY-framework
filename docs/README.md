@@ -51,7 +51,7 @@ Production deployment instructions covering:
 4. **Maintenance**: Schedule regular cleanup and backup tasks
 
 ### For Users
-1. **Live Documentation**: Access `/docs` from the application navigation menu
+1. **Live Documentation**: Access `/docs` from the application navigation menu (login required)
 2. **API Reference**: Use [API Reference](API.md) for integration
 3. **Authentication**: Understand security features from [Security Guide](SECURITY.md)
 4. **Support**: Check documentation before reporting issues

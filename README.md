@@ -226,8 +226,9 @@ The framework uses a modular route architecture for better maintainability and s
 - `GET /profile/change-password` - Change password page (authenticated)
 - `POST /profile/change-password` - Change password processing
 - `GET /page1` - Sample page demonstrating navigation
-- `GET /docs` - Integrated documentation system
-- `GET /docs/{doc_name}` - View specific documentation pages
+- `GET /settings` - Comprehensive user settings and account management
+- `GET /docs` - Integrated documentation system (authenticated)
+- `GET /docs/{doc_name}` - View specific documentation pages (authenticated)
 - `GET /health` - Health check endpoint
 
 ### Development Endpoints (dev.py only)
