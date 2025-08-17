@@ -27,6 +27,7 @@ with redirect_stderr(stderr_buffer):
     from src.framework.csrf import CSRFProtection, add_csrf_middleware
     from src.framework.security import add_security_middleware, create_security_config
     from src.framework.routes import create_auth_routes, create_main_routes, create_2fa_routes
+    from src.framework.routes.audit_routes import create_audit_routes
 
 def create_production_app():
     app = FastHTML(
@@ -60,6 +61,7 @@ def create_production_app():
     create_auth_routes(app, db, auth_service, email_service, csrf_protection)
     create_main_routes(app, db, auth_service, is_development=False, csrf_protection=csrf_protection)
     create_2fa_routes(app, db, auth_service, csrf_protection)
+    create_audit_routes(app, db)
     
     # Mount static files
     app.mount("/static", StaticFiles(directory="static"), name="static")

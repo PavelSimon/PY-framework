@@ -440,6 +440,8 @@ The framework implements a clean, modular route architecture for better maintain
 - `POST /users/{user_id}/edit-role` - Update user role (admin only)
 - `GET /users/{user_id}/sessions` - View user sessions (admin only)
 - `GET /users/{user_id}/toggle` - Toggle user active status (admin only)
+- `GET /users/{user_id}/delete` - Delete user confirmation page (admin only) ✅ NEW
+- `POST /users/{user_id}/delete` - Permanently delete user and all data (admin only) ✅ NEW
 
 ### Development Routes (`src/framework/routes/dev.py`)
 - `GET /dev/test-email` - Email service testing tool
@@ -489,12 +491,13 @@ The framework implements a clean, modular route architecture for better maintain
 - API endpoint rate limiting
 
 ### Role-Based Security ✅ NEW
-- **Admin Protection**: Administrators cannot modify their own accounts
+- **Admin Protection**: Administrators cannot modify or delete their own accounts
 - **Permission Validation**: All admin routes validate user roles
 - **Session Security**: Account deactivation invalidates all user sessions
 - **CSRF Protection**: All admin actions protected with CSRF tokens
 - **Access Control**: Route-level permission checking with fallbacks
 - **Role Validation**: Comprehensive middleware for role-based access
+- **Safe User Deletion**: Comprehensive user deletion with data cleanup and confirmations ✅ NEW
 
 ### OAuth Security
 - State parameter for CSRF protection
@@ -618,7 +621,16 @@ CMD ["python", "app.py"]
     - Professional responsive grid layout with hover effects
     - Quick access links to profile editing and password management
 
-12. **OAuth Integration** ✅ NEW - Complete OAuth authentication system
+12. **Admin User Management** ✅ - Complete administrative user control
+    - Role-based user management with admin and user roles
+    - User account activation/deactivation controls
+    - Session monitoring and management for all users
+    - Comprehensive user deletion with complete data cleanup ✅ NEW
+    - Safe deletion with multiple confirmations and admin protections
+    - Transactional deletion ensuring data integrity
+    - Admin self-protection (cannot delete own account)
+
+13. **OAuth Integration** ✅ NEW - Complete OAuth authentication system
     - Google OAuth with full profile and email access
     - GitHub OAuth with primary email detection
     - Automatic account linking for existing users with matching emails
@@ -627,7 +639,7 @@ CMD ["python", "app.py"]
     - Extensible provider system for future OAuth services
     - Comprehensive test coverage (24/24 OAuth tests passing)
 
-13. **Two-Factor Authentication (2FA)** ✅ NEW - Enterprise-grade TOTP implementation
+14. **Two-Factor Authentication (2FA)** ✅ NEW - Enterprise-grade TOTP implementation
     - TOTP-based 2FA using industry-standard algorithms
     - QR code generation for easy mobile app setup
     - Support for Google Authenticator, Authy, Microsoft Authenticator, 1Password

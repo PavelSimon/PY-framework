@@ -65,7 +65,7 @@ Production deployment instructions covering:
 - **OAuth Integration**: Complete Google and GitHub OAuth implementation ✅ NEW
 - **Two-Factor Authentication**: Enterprise-grade TOTP with QR codes and backup codes ✅ NEW
 - **User Management**: Profile editing, password changes, session management
-- **Admin Features**: User role assignment, account management, session monitoring
+- **Admin Features**: User role assignment, account management, session monitoring, user deletion
 - **Email Integration**: Verification emails, password reset emails, testing tools
 - **Professional UI**: Responsive navigation, mobile-friendly design, session-aware routing
 - **User Experience**: Direct dashboard redirect after login, intelligent homepage routing

@@ -547,6 +547,91 @@ class Database:
             print(f"Error updating user role: {e}")
             return False
 
+    def delete_user(self, user_id: int) -> bool:
+        """Permanently delete a user and all associated data"""
+        try:
+            # First, let's find all tables and see what's referencing this user
+            print(f"=== Investigating user_id {user_id} references ===")
+            
+            # Get all table names
+            tables_result = self.conn.execute("""
+                SELECT table_name 
+                FROM information_schema.tables 
+                WHERE table_schema = 'main' AND table_type = 'BASE TABLE'
+            """)
+            all_tables = [row[0] for row in tables_result.fetchall()]
+            print(f"Found tables: {all_tables}")
+            
+            # Check each table for user_id references
+            for table in all_tables:
+                try:
+                    # Check if table has user_id column
+                    columns_result = self.conn.execute(f"""
+                        SELECT column_name 
+                        FROM information_schema.columns 
+                        WHERE table_name = '{table}' AND column_name = 'user_id'
+                    """)
+                    if columns_result.fetchone():
+                        # Count records for this user
+                        count_result = self.conn.execute(f"SELECT COUNT(*) FROM {table} WHERE user_id = ?", [user_id])
+                        count = count_result.fetchone()[0]
+                        if count > 0:
+                            print(f"Table {table} has {count} records for user_id {user_id}")
+                        else:
+                            print(f"Table {table} has user_id column but no records for user {user_id}")
+                except Exception as e:
+                    print(f"Could not check table {table}: {e}")
+            
+            # Start transaction for atomicity
+            self.conn.execute("BEGIN TRANSACTION")
+            
+            # Delete in correct order - using explicit table list
+            tables_to_clean = [
+                'sessions',
+                'email_verification_tokens', 
+                'password_reset_tokens',
+                'oauth_accounts',
+                'totp_secrets',
+                'backup_codes', 
+                'two_factor_tokens'
+            ]
+            
+            for table in tables_to_clean:
+                try:
+                    # Count first
+                    count_result = self.conn.execute(f"SELECT COUNT(*) FROM {table} WHERE user_id = ?", [user_id])
+                    count = count_result.fetchone()[0]
+                    
+                    # Delete
+                    self.conn.execute(f"DELETE FROM {table} WHERE user_id = ?", [user_id])
+                    print(f"Cleaned {table}: {count} records")
+                    
+                except Exception as e:
+                    print(f"Error cleaning {table}: {e}")
+            
+            # Try to delete the user
+            try:
+                result = self.conn.execute("DELETE FROM users WHERE id = ?", [user_id])
+                print(f"User deletion attempt completed")
+                
+                # Commit the transaction
+                self.conn.execute("COMMIT")
+                return True
+                
+            except Exception as delete_error:
+                print(f"User deletion failed: {delete_error}")
+                self.conn.execute("ROLLBACK")
+                return False
+            
+        except Exception as e:
+            print(f"Error deleting user: {e}")
+            # Rollback on error
+            try:
+                self.conn.execute("ROLLBACK")
+            except Exception as rollback_error:
+                print(f"Error during rollback: {rollback_error}")
+            return False
+
     def close(self):
         if self.conn:
             self.conn.close()

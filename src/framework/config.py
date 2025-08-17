@@ -46,6 +46,9 @@ class Settings(BaseSettings):
     
     cors_origins: str = "http://localhost:3000,http://localhost:8000"
     
+    audit_log_file: Optional[str] = "logs/audit.log"
+    audit_retention_days: int = 90
+    
     @field_validator('secret_key')
     @classmethod
     def validate_secret_key(cls, v):

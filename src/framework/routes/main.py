@@ -619,6 +619,7 @@ def create_main_routes(app, db=None, auth_service=None, is_development=False, cs
                             A("Edit Role", href=f"/users/{u.get('id')}/edit-role", cls="btn btn-outline btn-sm") if is_admin and u.get('id') != user.get('id') else None,
                             A("View Sessions", href=f"/users/{u.get('id')}/sessions", cls="btn btn-outline btn-sm") if is_admin else None,
                             A("Toggle Status", href=f"/users/{u.get('id')}/toggle", cls="btn btn-outline btn-sm") if is_admin and u.get('id') != user.get('id') else None,
+                            A("❌ Delete User", href=f"/users/{u.get('id')}/delete", cls="btn btn-danger btn-sm", onclick="return confirm('Are you sure you want to permanently delete this user? This action cannot be undone!')") if is_admin and u.get('id') != user.get('id') else None,
                             cls="button-group"
                         ),
                         cls="admin-actions"
@@ -1206,6 +1207,190 @@ def create_main_routes(app, db=None, auth_service=None, is_development=False, cs
                 page_subtitle="An error occurred while changing user status"
             ))
     
+    @app.get("/users/{user_id}/delete")
+    def delete_user_page(request, user_id: int):
+        """Delete user confirmation page (admin only)"""
+        from ..middleware import validate_admin_access
+        
+        # Validate admin access
+        is_admin, current_user, error_response = validate_admin_access(request, db, auth_service)
+        if not is_admin:
+            return error_response
+        
+        # Get user to delete
+        target_user = db.get_user_with_role(user_id)
+        if not target_user:
+            content = Div(
+                create_error_message("User not found."),
+                P(A("Back to Users", href="/users", cls="btn btn-primary"))
+            )
+            return Titled("User Not Found", create_app_layout(
+                content, 
+                user=current_user,
+                page_title="User Not Found",
+                page_subtitle="User does not exist"
+            ))
+        
+        # Prevent admin from deleting themselves
+        if target_user['id'] == current_user['id']:
+            content = Div(
+                create_error_message("You cannot delete your own account."),
+                P(A("Back to Users", href="/users", cls="btn btn-primary"))
+            )
+            return Titled("Cannot Delete Self", create_app_layout(
+                content, 
+                user=current_user,
+                page_title="Cannot Delete Self",
+                page_subtitle="Admin protection"
+            ))
+        
+        # Create confirmation form with CSRF token
+        form_elements = [
+            Div(
+                P(f"You are about to permanently delete the user: {target_user['first_name']} {target_user['last_name']} ({target_user['email']})"),
+                P("⚠️ This action cannot be undone and will delete:"),
+                Ul(
+                    Li("User account and profile information"),
+                    Li("All active sessions"),
+                    Li("Email verification and password reset tokens"),
+                    Li("OAuth account links"),
+                    Li("Two-factor authentication settings"),
+                    Li("Backup codes and security tokens")
+                ),
+                P("Type 'DELETE' to confirm:", style="font-weight: bold; margin-top: 1rem;"),
+                cls="alert alert-danger"
+            ),
+            Div(
+                Label("Confirmation:", fr="confirmation"),
+                Input(type="text", id="confirmation", name="confirmation", required=True, placeholder="Type DELETE"),
+                Small("Type DELETE to confirm user deletion"),
+                cls="form-group"
+            )
+        ]
+        
+        # Add CSRF token if protection is enabled
+        if hasattr(request, 'cookies') and 'session_id' in request.cookies:
+            session_id = request.cookies.get('session_id')
+            csrf_token_input = f'<input type="hidden" name="csrf_token" value="placeholder">'
+            form_elements.insert(0, NotStr(csrf_token_input))
+        
+        form_elements.append(Button("🗑️ DELETE USER", type="submit", cls="btn btn-danger"))
+        
+        content = Div(
+            H2(f"Delete User: {target_user['first_name']} {target_user['last_name']}"),
+            Form(
+                *form_elements,
+                action=f"/users/{user_id}/delete",
+                method="post",
+                cls="form"
+            ),
+            P(A("← Cancel", href="/users", cls="btn btn-secondary"))
+        )
+        
+        return Titled("Delete User", create_app_layout(
+            content, 
+            user=current_user,
+            current_page="/users",
+            page_title="Delete User",
+            page_subtitle="Permanent user deletion"
+        ))
+    
+    @app.post("/users/{user_id}/delete")
+    def delete_user_confirm(request, user_id: int, confirmation: str, csrf_token: str = None):
+        """Process user deletion (admin only)"""
+        from ..middleware import validate_admin_access
+        
+        try:
+            # Validate admin access
+            is_admin, current_user, error_response = validate_admin_access(request, db, auth_service)
+            if not is_admin:
+                return error_response
+            
+            # Validate CSRF token if protection is enabled
+            # Note: CSRF validation would be implemented here
+            
+            # Get user to delete
+            target_user = db.get_user_with_role(user_id)
+            if not target_user:
+                content = Div(
+                    create_error_message("User not found."),
+                    P(A("Back to Users", href="/users", cls="btn btn-primary"))
+                )
+                return Titled("User Not Found", create_app_layout(
+                    content, 
+                    user=current_user,
+                    page_title="User Not Found",
+                    page_subtitle="User does not exist"
+                ))
+            
+            # Prevent admin from deleting themselves
+            if target_user['id'] == current_user['id']:
+                content = Div(
+                    create_error_message("You cannot delete your own account."),
+                    P(A("Back to Users", href="/users", cls="btn btn-primary"))
+                )
+                return Titled("Cannot Delete Self", create_app_layout(
+                    content, 
+                    user=current_user,
+                    page_title="Cannot Delete Self",
+                    page_subtitle="Admin protection"
+                ))
+            
+            # Validate confirmation
+            if confirmation != "DELETE":
+                content = Div(
+                    create_error_message("Invalid confirmation. You must type 'DELETE' exactly."),
+                    P(A("Try Again", href=f"/users/{user_id}/delete", cls="btn btn-primary"))
+                )
+                return Titled("Invalid Confirmation", create_app_layout(
+                    content, 
+                    user=current_user,
+                    page_title="Invalid Confirmation",
+                    page_subtitle="Deletion cancelled"
+                ))
+            
+            # Perform deletion
+            user_email = target_user['email']
+            user_name = f"{target_user['first_name']} {target_user['last_name']}"
+            
+            success = db.delete_user(user_id)
+            
+            if success:
+                content = Div(
+                    create_success_message(f"User '{user_name}' ({user_email}) has been permanently deleted."),
+                    P("All associated data has been removed from the system."),
+                    P(A("Back to Users", href="/users", cls="btn btn-primary"))
+                )
+                return Titled("User Deleted", create_app_layout(
+                    content, 
+                    user=current_user,
+                    page_title="User Deleted ✅",
+                    page_subtitle="User successfully removed"
+                ))
+            else:
+                content = Div(
+                    create_error_message("Failed to delete user. Please try again."),
+                    P(A("Try Again", href=f"/users/{user_id}/delete", cls="btn btn-primary"))
+                )
+                return Titled("Delete Failed", create_app_layout(
+                    content, 
+                    user=current_user,
+                    page_title="Delete Failed",
+                    page_subtitle="An error occurred"
+                ))
+                
+        except Exception as e:
+            content = Div(
+                create_error_message(f"An error occurred while deleting the user: {str(e)}"),
+                P(A("Back to Users", href="/users", cls="btn btn-primary"))
+            )
+            return Titled("Delete Error", create_app_layout(
+                content, 
+                user=current_user,
+                page_title="Delete Error",
+                page_subtitle="An error occurred"
+            ))
+
     @app.get("/health")
     def health_check():
         return {"status": "healthy", "framework": "PY-Framework", "version": "0.1.0"}

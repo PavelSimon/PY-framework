@@ -683,7 +683,8 @@ Role ID 0 (Administrator):
 - Can edit other users' roles
 - Can view all user sessions
 - Can activate/deactivate accounts
-- Cannot modify own account
+- Can permanently delete users ✅ NEW
+- Cannot modify or delete own account
 
 Role ID 1 (Regular User):
 - Personal account access only
