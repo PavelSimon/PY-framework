@@ -51,9 +51,10 @@ Production deployment instructions covering:
 4. **Maintenance**: Schedule regular cleanup and backup tasks
 
 ### For Users
-1. **API**: Use [API Reference](API.md) for integration
-2. **Authentication**: Understand security features from [Security Guide](SECURITY.md)
-3. **Support**: Check documentation before reporting issues
+1. **Live Documentation**: Access `/docs` from the application navigation menu
+2. **API Reference**: Use [API Reference](API.md) for integration
+3. **Authentication**: Understand security features from [Security Guide](SECURITY.md)
+4. **Support**: Check documentation before reporting issues
 
 ## 🔍 Framework Features Summary
 
@@ -64,6 +65,7 @@ Production deployment instructions covering:
 - **Email Integration**: Verification emails, password reset emails, testing tools
 - **Professional UI**: Responsive navigation, mobile-friendly design, session-aware routing
 - **User Experience**: Direct dashboard redirect after login, intelligent homepage routing
+- **Documentation System**: Integrated docs viewer with markdown rendering and navigation
 - **Testing**: 68/68 tests passing with comprehensive coverage
 - **Documentation**: Complete guides for development and deployment
 

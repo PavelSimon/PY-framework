@@ -440,6 +440,88 @@ def create_main_routes(app, db=None, auth_service=None, is_development=False, cs
                 page_subtitle="An error occurred while changing your password"
             ))
     
+    @app.get("/docs")
+    def docs_index(request):
+        # Redirect to overview doc by default
+        return RedirectResponse("/docs/overview", status_code=302)
+    
+    @app.get("/docs/{doc_name}")
+    def docs_view(request, doc_name: str):
+        import os
+        import markdown
+        
+        # Get current user for layout
+        user = get_current_user(request, db, auth_service)
+        
+        # Map doc names to files
+        doc_files = {
+            "overview": ("Project Overview", "README.md"),
+            "security": ("Security Guide", "docs/SECURITY.md"),
+            "api": ("API Reference", "docs/API.md"),
+            "deployment": ("Deployment Guide", "docs/DEPLOYMENT.md"),
+            "specifications": ("Development Specs", "CLAUDE.md")
+        }
+        
+        if doc_name not in doc_files:
+            return RedirectResponse("/docs/overview", status_code=302)
+        
+        doc_title, doc_file = doc_files[doc_name]
+        
+        # Read the markdown file
+        try:
+            project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+            file_path = os.path.join(project_root, doc_file)
+            
+            with open(file_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+            
+            # Convert markdown to HTML
+            html_content = markdown.markdown(content, extensions=['codehilite', 'fenced_code'])
+            
+        except Exception as e:
+            html_content = f"<p>Error loading documentation: {str(e)}</p>"
+        
+        # Create docs sidebar
+        docs_sidebar = Div(
+            H3("📚 Documentation"),
+            Ul(
+                Li(A("Project Overview", href="/docs/overview", 
+                    cls="active" if doc_name == "overview" else "")),
+                Li(A("Security Guide", href="/docs/security", 
+                    cls="active" if doc_name == "security" else "")),
+                Li(A("API Reference", href="/docs/api", 
+                    cls="active" if doc_name == "api" else "")),
+                Li(A("Deployment Guide", href="/docs/deployment", 
+                    cls="active" if doc_name == "deployment" else "")),
+                Li(A("Development Specs", href="/docs/specifications", 
+                    cls="active" if doc_name == "specifications" else "")),
+                cls="docs-nav"
+            ),
+            cls="docs-sidebar"
+        )
+        
+        # Main content area with raw HTML
+        main_content = Div(
+            Div(NotStr(html_content), cls="docs-content"),
+            cls="docs-main"
+        )
+        
+        # Combine sidebar and content
+        content = Div(
+            docs_sidebar,
+            main_content,
+            cls="docs-layout"
+        )
+        
+        return Titled(f"{doc_title} - PY-Framework", create_app_layout(
+            content, 
+            user=user, 
+            current_page=f"docs_{doc_name}",
+            page_title=doc_title,
+            page_subtitle="PY-Framework Documentation",
+            show_sidebar=False  # We'll use our own docs sidebar
+        ))
+    
     @app.get("/health")
     def health_check():
         return {"status": "healthy", "framework": "PY-Framework", "version": "0.1.0"}

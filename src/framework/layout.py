@@ -18,6 +18,8 @@ def create_navbar(user: Optional[Dict] = None, current_page: str = "home"):
         Ul(
             Li(A("1. stránka", href="/page1", 
                 cls="active" if current_page == "page1" else "")),
+            Li(A("📚 Docs", href="/docs", 
+                cls="active" if current_page.startswith("docs") else "")),
             cls="nav-main-menu"
         ),
         cls="nav-left"

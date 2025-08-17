@@ -236,6 +236,37 @@ csrf_token: string (required if CSRF enabled) - CSRF protection token
 **Authentication**: Session required
 **Response**: Sample page with navigation demonstration
 
+### Documentation System
+
+#### `GET /docs`
+**Description**: Documentation system homepage
+**Authentication**: None required
+**Response**: 302 redirect to `/docs/overview`
+
+#### `GET /docs/{doc_name}`
+**Description**: View specific documentation page with markdown rendering
+**Authentication**: None required
+
+**Parameters**:
+- `doc_name` (path): Documentation page name
+
+**Available Documentation Pages**:
+- `overview` - Project Overview (README.md)
+- `security` - Security Guide
+- `api` - API Reference
+- `deployment` - Deployment Guide  
+- `specifications` - Development Specifications (CLAUDE.md)
+
+**Response**: 
+- Success: HTML page with markdown content rendered and navigation sidebar
+- Invalid doc_name: 302 redirect to `/docs/overview`
+
+**Features**:
+- Responsive sidebar navigation
+- Markdown to HTML conversion with syntax highlighting
+- Professional styling for code blocks and tables
+- Mobile-friendly responsive design
+
 ## System Endpoints
 
 ### Health Check

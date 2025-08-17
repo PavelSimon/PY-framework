@@ -17,7 +17,7 @@ Created with full support for Claude Code.
 - **CSRF Protection**: Cross-site request forgery prevention with HMAC-signed tokens
 - **Security Middleware**: Production-grade security headers, rate limiting, and IP tracking
 - **Account Protection**: Automatic lockout after failed attempts with configurable duration
-- **Professional Navigation**: 3-tier navigation with top menu, sidebar, and persona dropdown
+- **Professional Navigation**: 3-tier navigation with top menu, sidebar, persona dropdown, and integrated docs
 - **Responsive Design**: Mobile-optimized layout with collapsible sidebar
 - **Favicon Integration**: Professional favicon in navigation and browser tabs
 - **Modular Architecture**: Clean route organization with separation of concerns
@@ -27,6 +27,12 @@ Created with full support for Claude Code.
 - **Two-Factor Authentication**: Enhanced account security with TOTP
 - **Admin Dashboard**: User management and system monitoring
 - **Performance Optimization**: Caching and database optimization
+
+### 📚 **Documentation Features**
+- **Integrated Documentation System**: Built-in `/docs` endpoint with markdown rendering
+- **Live Documentation Access**: "📚 Docs" menu item for instant documentation access  
+- **Professional Styling**: Code syntax highlighting and responsive layout
+- **Comprehensive Coverage**: Security, API, deployment, and development guides
 
 ### 📊 TESTING STATUS
 - **68/68 tests passing** ✅
@@ -220,6 +226,8 @@ The framework uses a modular route architecture for better maintainability and s
 - `GET /profile/change-password` - Change password page (authenticated)
 - `POST /profile/change-password` - Change password processing
 - `GET /page1` - Sample page demonstrating navigation
+- `GET /docs` - Integrated documentation system
+- `GET /docs/{doc_name}` - View specific documentation pages
 - `GET /health` - Health check endpoint
 
 ### Development Endpoints (dev.py only)

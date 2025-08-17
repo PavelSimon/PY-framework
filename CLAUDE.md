@@ -469,12 +469,20 @@ CMD ["python", "app.py"]
    - Optimized indexes for performance
 
 9. **Navigation Layout** ✅ - Professional navigation system
-   - Top navigation bar with favicon and main menu ("1. stránka")
+   - Top navigation bar with favicon and main menu ("1. stránka", "📚 Docs")
    - Persona icon with dropdown (profile edit, logout)
    - Left sidebar for app-specific submenus (configurable)
+   - Integrated documentation system with markdown rendering
    - Responsive design for mobile devices
    - Session-aware routing and navigation
    - Consistent layout components and utilities
+
+10. **Documentation System** ✅ - Integrated documentation viewer
+    - Built-in documentation browser at `/docs`
+    - Markdown to HTML conversion with syntax highlighting
+    - Responsive sidebar navigation for all documentation files
+    - Professional styling with code syntax highlighting
+    - Live documentation access from navigation menu
 
 ### 🔄 NEXT DEVELOPMENT STEPS
 1. **OAuth Integration** - Google and GitHub OAuth providers
