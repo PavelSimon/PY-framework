@@ -568,6 +568,164 @@ csrf_token: string (required) - CSRF protection token
 - Tokens are session-bound for security
 - Failed CSRF validation returns 403 Forbidden
 
+## Admin Audit & Performance Endpoints ✅ NEW
+
+### Audit Dashboard
+
+#### `GET /admin/audit`
+**Description**: Security audit dashboard with monitoring and statistics
+**Authentication**: Session required
+**Role Requirements**: Administrator (role_id = 0)
+**Response**: HTML audit dashboard with security events and statistics
+
+**Features**:
+- Recent security events (24 hours)
+- Login statistics (30 days) 
+- Security event monitoring
+- Quick access to user activity and export functions
+
+**Security Events Displayed**:
+- Event timestamps and types
+- User IDs and IP addresses
+- User agent information
+- Success/failure indicators
+
+#### `GET /admin/audit/users`
+**Description**: User activity audit with filtering and search
+**Authentication**: Session required
+**Role Requirements**: Administrator (role_id = 0)
+
+**Query Parameters**:
+```
+user_id: integer (optional) - Filter by specific user ID
+limit: integer (optional, default=50) - Number of records to display
+```
+
+**Response**: HTML page with user activity audit
+
+**Features**:
+- User selection dropdown
+- Activity filtering and limits
+- Detailed user activity logs
+- Event success/failure tracking
+
+#### `GET /admin/audit/stats`
+**Description**: System audit statistics and analytics
+**Authentication**: Session required
+**Role Requirements**: Administrator (role_id = 0)
+
+**Query Parameters**:
+```
+days: integer (optional, default=30) - Statistics period in days
+```
+
+**Response**: HTML page with system statistics
+
+**Statistics Included**:
+- Authentication statistics (successful/failed logins)
+- Security event summaries
+- User activity patterns
+- Success rate calculations
+
+#### `GET /admin/audit/export`
+**Description**: Export audit log data (placeholder for future implementation)
+**Authentication**: Session required
+**Role Requirements**: Administrator (role_id = 0)
+
+**Query Parameters**:
+```
+days: integer (optional, default=30) - Export period in days
+format: string (optional, default=csv) - Export format (csv, json)
+```
+
+**Response**: Currently placeholder page, future CSV/JSON export
+
+### Performance Monitoring
+
+#### `GET /admin/performance`
+**Description**: Performance monitoring dashboard with real-time metrics
+**Authentication**: Session required
+**Role Requirements**: Administrator (role_id = 0)
+**Response**: HTML performance dashboard with metrics and optimization tools
+
+**Performance Metrics Displayed**:
+- Cache performance (hit rate, size, utilization)
+- Query performance (average time, total queries)
+- Session cache utilization
+- System health indicators
+
+**Dashboard Sections**:
+- Performance overview cards
+- Cache performance details
+- Query performance analysis
+- Database optimization tools
+
+#### `GET /admin/performance/api/stats`
+**Description**: API endpoint for performance statistics (JSON)
+**Authentication**: Session required
+**Role Requirements**: Administrator (role_id = 0)
+
+**Response** (JSON):
+```json
+{
+  "timestamp": "2024-01-01T12:00:00",
+  "performance": {
+    "cache": {
+      "hit_rate_percent": 85.2,
+      "size": 1024,
+      "total_requests": 5000
+    },
+    "queries": {
+      "avg_time_ms": 12.5,
+      "total_queries": 2500
+    },
+    "sessions": {
+      "utilization_percent": 65.0,
+      "total_sessions": 150
+    }
+  },
+  "database": {
+    "slow_queries": [...],
+    "frequent_queries": [...]
+  }
+}
+```
+
+#### `POST /admin/performance/optimize`
+**Description**: Run database optimization tasks
+**Authentication**: Session required
+**Role Requirements**: Administrator (role_id = 0)
+
+**Request Body** (form data):
+```
+csrf_token: string (required) - CSRF protection token
+```
+
+**Response**: 
+- JSON for AJAX requests with optimization results
+- Redirect to dashboard for form submissions
+
+**Optimization Tasks**:
+- Clean up expired sessions
+- Remove expired verification tokens
+- Clear expired cache entries
+- Database maintenance operations
+
+#### `GET /admin/performance/clear-cache`
+**Description**: Clear performance cache and session cache
+**Authentication**: Session required
+**Role Requirements**: Administrator (role_id = 0)
+
+**Response**:
+- JSON for AJAX requests with cache clear results
+- Redirect to dashboard for direct access
+
+**Cache Operations**:
+- Performance cache cleanup
+- Session cache clearing
+- Memory optimization
+- Cache statistics reset
+
 ## Admin Endpoints ✅ NEW
 
 ### User Management

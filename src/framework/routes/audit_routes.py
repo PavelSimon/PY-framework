@@ -62,9 +62,20 @@ def create_audit_routes(app, db: Database, auth_service=None):
             # Security events table
             security_rows = []
             for event in security_events:
+                # Format timestamp properly - handle both string and datetime objects
+                timestamp = event['timestamp']
+                if timestamp:
+                    if isinstance(timestamp, str):
+                        formatted_timestamp = timestamp[:19]
+                    else:
+                        # Handle datetime object
+                        formatted_timestamp = timestamp.strftime('%Y-%m-%d %H:%M:%S')
+                else:
+                    formatted_timestamp = 'N/A'
+                
                 security_rows.append(
                     Tr(
-                        Td(event['timestamp'][:19] if event['timestamp'] else 'N/A'),
+                        Td(formatted_timestamp),
                         Td(event['event_type'].replace('_', ' ').title()),
                         Td(event['user_id'] if event['user_id'] else 'Anonymous'),
                         Td(event['ip_address'] if event['ip_address'] else 'N/A'),
@@ -210,9 +221,20 @@ def create_audit_routes(app, db: Database, auth_service=None):
                 if activity:
                     activity_rows = []
                     for event in activity:
+                        # Format timestamp properly - handle both string and datetime objects
+                        timestamp = event['timestamp']
+                        if timestamp:
+                            if isinstance(timestamp, str):
+                                formatted_timestamp = timestamp[:19]
+                            else:
+                                # Handle datetime object
+                                formatted_timestamp = timestamp.strftime('%Y-%m-%d %H:%M:%S')
+                        else:
+                            formatted_timestamp = 'N/A'
+                        
                         activity_rows.append(
                             Tr(
-                                Td(event['timestamp'][:19] if event['timestamp'] else 'N/A'),
+                                Td(formatted_timestamp),
                                 Td(event['event_type'].replace('_', ' ').title()),
                                 Td("✅" if event['success'] else "❌"),
                                 Td(event['ip_address'] if event['ip_address'] else 'N/A'),

@@ -36,7 +36,8 @@ uv run python dev_simple.py
 - **Application**: http://localhost:8000
 - **Admin Login**: admin@admin.com / AdminPass123!
 - **Pavel's Admin Account**: Pavel@pavel-simon.com / <your_password>
-- **Audit Dashboard**: http://localhost:8000/admin/audit
+- **Audit Dashboard**: http://localhost:8000/admin/audit ✅ NEW
+- **Performance Dashboard**: http://localhost:8000/admin/performance ✅ NEW
 - **Development Tools**: http://localhost:8000/dev/
 
 ## Available Admin Accounts
@@ -59,6 +60,8 @@ uv run python dev_simple.py
    - Email testing: http://localhost:8000/dev/test-email
    - Auth testing: http://localhost:8000/dev/test-auth
    - Database inspector: http://localhost:8000/dev/database
+   - Audit dashboard: http://localhost:8000/admin/audit ✅ NEW
+   - Performance monitoring: http://localhost:8000/admin/performance ✅ NEW
 
 ## Troubleshooting
 

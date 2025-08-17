@@ -703,9 +703,9 @@ def create_main_routes(app, db=None, auth_service=None, is_development=False, cs
                         H4("System Actions"),
                         P("System-wide administration functions."),
                         Div(
-                            A("View All Sessions", href="/admin/sessions", cls="btn btn-outline"),
-                            A("System Settings", href="/admin/settings", cls="btn btn-outline"),
-                            A("Security Log", href="/admin/security", cls="btn btn-secondary"),
+                            A("User Management", href="/users", cls="btn btn-outline"),
+                            A("System Settings", href="/settings", cls="btn btn-outline"),
+                            A("Documentation", href="/docs", cls="btn btn-secondary"),
                             cls="button-group"
                         ),
                         cls="admin-tools-card"

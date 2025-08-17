@@ -18,10 +18,20 @@ This guide covers deploying PY-Framework to production with security best practi
 
 ### Performance Requirements ✅
 - [ ] Database optimized and indexed
+- [ ] Performance optimization enabled
+- [ ] Cache settings configured
+- [ ] Connection pooling enabled
 - [ ] Static files properly served
 - [ ] Session cleanup scheduled
 - [ ] Log rotation configured
 - [ ] Monitoring setup
+
+### Audit & Monitoring Requirements ✅ NEW
+- [ ] Audit logging enabled
+- [ ] Performance monitoring configured
+- [ ] Admin dashboard access secured
+- [ ] Log retention policy set
+- [ ] Security event monitoring enabled
 
 ## Environment Configuration
 
@@ -51,6 +61,21 @@ GOOGLE_CLIENT_ID=your-google-client-id
 GOOGLE_CLIENT_SECRET=your-google-client-secret
 GITHUB_CLIENT_ID=your-github-client-id
 GITHUB_CLIENT_SECRET=your-github-client-secret
+
+# Performance Optimization ✅ NEW
+ENABLE_PERFORMANCE_OPTIMIZATION=true
+CACHE_DEFAULT_TTL=300
+CACHE_MAX_SIZE=1000
+SESSION_CACHE_MAX_SESSIONS=1000
+CONNECTION_POOL_MAX_CONNECTIONS=10
+QUERY_SLOW_THRESHOLD_MS=100.0
+ENABLE_QUERY_OPTIMIZATION=true
+ENABLE_CONNECTION_POOLING=true
+
+# Audit Logging ✅ NEW
+ENABLE_AUDIT_LOGGING=true
+AUDIT_LOG_RETENTION_DAYS=90
+AUDIT_LOG_MAX_EVENTS=10000
 ```
 
 ### Secret Key Generation

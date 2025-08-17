@@ -9,6 +9,7 @@ from ..email import EmailService
 from ..layout import create_auth_layout, create_page_title, create_success_message, create_error_message, create_warning_message
 from ..session import create_session_response, store_session, clear_session
 from ..csrf import csrf_protect
+from ..audit import get_audit_service, AuditEventType
 
 
 def create_auth_routes(app, db, auth_service, email_service=None, csrf_protection=None):
@@ -117,6 +118,11 @@ def create_auth_routes(app, db, auth_service, email_service=None, csrf_protectio
     @app.post("/auth/register")
     def register_user(request, email: str, password: str, first_name: str = None, last_name: str = None, csrf_token: str = None):
         try:
+            # Get audit service and client info
+            audit_service = get_audit_service(db)
+            client_ip = request.client.host if hasattr(request, 'client') else None
+            user_agent = request.headers.get('user-agent', '')
+            
             # Validate CSRF token if protection is enabled
             if csrf_protection:
                 session_id = request.cookies.get('session_id')
@@ -142,6 +148,16 @@ def create_auth_routes(app, db, auth_service, email_service=None, csrf_protectio
             success, user_id, message = auth_service.register_user(db, registration)
             
             if not success:
+                # Log failed registration attempt
+                audit_service.log_authentication_event(
+                    event_type=AuditEventType.USER_REGISTRATION,
+                    email=email,
+                    ip_address=client_ip,
+                    user_agent=user_agent,
+                    success=False,
+                    details={'failure_reason': message}
+                )
+                
                 content = Div(
                     create_error_message(message),
                     P(A("Try again", href="/auth/register", cls="btn btn-primary"))
@@ -151,6 +167,17 @@ def create_auth_routes(app, db, auth_service, email_service=None, csrf_protectio
                     page_title="Registration Failed",
                     page_subtitle="Unable to create your account"
                 ))
+            
+            # Log successful registration
+            audit_service.log_authentication_event(
+                event_type=AuditEventType.USER_REGISTRATION,
+                user_id=user_id,
+                email=email,
+                ip_address=client_ip,
+                user_agent=user_agent,
+                success=True,
+                details={'first_name': first_name, 'last_name': last_name}
+            )
             
             # Generate verification token and send email if email service is available
             if email_service:
@@ -270,6 +297,9 @@ def create_auth_routes(app, db, auth_service, email_service=None, csrf_protectio
     @app.post("/auth/login")
     def login_user(request, email: str, password: str, csrf_token: str = None):
         try:
+            # Get audit service
+            audit_service = get_audit_service(db)
+            
             # Validate CSRF token if protection is enabled
             if csrf_protection:
                 session_id = request.cookies.get('session_id')
@@ -288,6 +318,16 @@ def create_auth_routes(app, db, auth_service, email_service=None, csrf_protectio
             success, user, message = auth_service.authenticate_user(db, email, password, client_ip)
             
             if not success:
+                # Log failed login attempt
+                audit_service.log_authentication_event(
+                    event_type=AuditEventType.USER_LOGIN_FAILED,
+                    email=email,
+                    ip_address=client_ip,
+                    user_agent=user_agent,
+                    success=False,
+                    details={'failure_reason': message}
+                )
+                
                 return Div(
                     H1("Login Failed"),
                     P(message, cls="alert alert-danger"),
@@ -328,6 +368,17 @@ def create_auth_routes(app, db, auth_service, email_service=None, csrf_protectio
             # Create session (only if 2FA is not required)
             session_id = auth_service.create_session(db, user['id'], client_ip, user_agent)
             
+            # Log successful login
+            audit_service.log_authentication_event(
+                event_type=AuditEventType.USER_LOGIN_SUCCESS,
+                user_id=user['id'],
+                email=email,
+                ip_address=client_ip,
+                user_agent=user_agent,
+                session_id=session_id,
+                success=True
+            )
+            
             # Store session temporarily for development
             store_session(session_id, user['id'])
             
@@ -344,13 +395,35 @@ def create_auth_routes(app, db, auth_service, email_service=None, csrf_protectio
     
     @app.get("/auth/logout")
     def logout_user(request):
-        # Get session ID and invalidate it
+        # Get audit service and client info
+        audit_service = get_audit_service(db)
+        client_ip = request.client.host if hasattr(request, 'client') else None
+        user_agent = request.headers.get('user-agent', '')
+        
+        # Get session ID and user ID for audit logging
         session_id = request.cookies.get('session_id')
+        user_id = None
+        
         if session_id:
+            # Get user ID from session before invalidating it
+            session_data = auth_service.get_session(db, session_id)
+            if session_data:
+                user_id = session_data.get('user_id')
+            
             # Invalidate session in database
             auth_service.logout_user(db, session_id)
             # Clear session from temporary store
             clear_session(session_id)
+            
+            # Log logout event
+            audit_service.log_authentication_event(
+                event_type=AuditEventType.USER_LOGOUT,
+                user_id=user_id,
+                ip_address=client_ip,
+                user_agent=user_agent,
+                session_id=session_id,
+                success=True
+            )
         
         # Create logout content
         content = Div(
@@ -867,8 +940,22 @@ def create_auth_routes(app, db, auth_service, email_service=None, csrf_protectio
             from ..oauth import OAuthService
             oauth_service = OAuthService()
             
+            # Get audit service and client info for logging
+            audit_service = get_audit_service(db)
+            client_ip = request.client.host if hasattr(request, 'client') else None
+            user_agent = request.headers.get('user-agent', '')
+            
             # Check for OAuth errors
             if error:
+                # Log OAuth error
+                audit_service.log_authentication_event(
+                    event_type=AuditEventType.OAUTH_LOGIN_FAILED,
+                    ip_address=client_ip,
+                    user_agent=user_agent,
+                    success=False,
+                    details={'provider': provider, 'failure_reason': f'oauth_error_{error}'}
+                )
+                
                 error_descriptions = {
                     'access_denied': 'You cancelled the authorization request.',
                     'invalid_request': 'The OAuth request was invalid.',
@@ -902,6 +989,15 @@ def create_auth_routes(app, db, auth_service, email_service=None, csrf_protectio
             
             # Validate state parameter (CSRF protection)
             if not oauth_service.validate_state_token(state, provider):
+                # Log OAuth state validation failure (security event)
+                audit_service.log_authentication_event(
+                    event_type=AuditEventType.OAUTH_STATE_VALIDATION_FAILED,
+                    ip_address=client_ip,
+                    user_agent=user_agent,
+                    success=False,
+                    details={'provider': provider, 'failure_reason': 'invalid_state_token'}
+                )
+                
                 content = Div(
                     create_error_message("Invalid OAuth state token."),
                     P("This may be a security issue or an expired request."),
@@ -968,9 +1064,22 @@ def create_auth_routes(app, db, auth_service, email_service=None, csrf_protectio
     async def process_oauth_callback_async(oauth_service, oauth_provider, provider, code, state, request, db, auth_service):
         """Process OAuth callback asynchronously"""
         try:
+            # Get audit service and client info
+            audit_service = get_audit_service(db)
+            client_ip = request.client.host if hasattr(request, 'client') else None
+            user_agent = request.headers.get('user-agent', '')
             # Exchange code for token
             token_data = await oauth_provider.exchange_code_for_token(code, state)
             if not token_data:
+                # Log failed OAuth login
+                audit_service.log_authentication_event(
+                    event_type=AuditEventType.OAUTH_LOGIN_FAILED,
+                    ip_address=client_ip,
+                    user_agent=user_agent,
+                    success=False,
+                    details={'provider': provider, 'failure_reason': 'token_exchange_failed'}
+                )
+                
                 content = Div(
                     create_error_message("Failed to exchange OAuth code for token."),
                     P("The authorization may have expired or failed."),
@@ -1030,11 +1139,20 @@ def create_auth_routes(app, db, auth_service, email_service=None, csrf_protectio
                 )
                 
                 # Create session and log user in
-                client_ip = request.client.host if hasattr(request, 'client') else None
-                user_agent = request.headers.get('user-agent')
-                
                 session_id = auth_service.create_session(db, existing_user["id"], client_ip, user_agent)
                 store_session(session_id, existing_user["id"])
+                
+                # Log successful OAuth login
+                audit_service.log_authentication_event(
+                    event_type=AuditEventType.OAUTH_LOGIN_SUCCESS,
+                    user_id=existing_user["id"],
+                    email=existing_user.get("email"),
+                    ip_address=client_ip,
+                    user_agent=user_agent,
+                    session_id=session_id,
+                    success=True,
+                    details={'provider': provider, 'authentication_method': f'oauth_{provider}'}
+                )
                 
                 # Update login timestamp
                 db.update_user_login(existing_user["id"], reset_failed_attempts=True)
@@ -1076,11 +1194,30 @@ def create_auth_routes(app, db, auth_service, email_service=None, csrf_protectio
                     )
                     
                     # Create session and log user in
-                    client_ip = request.client.host if hasattr(request, 'client') else None
-                    user_agent = request.headers.get('user-agent')
-                    
                     session_id = auth_service.create_session(db, email_user["id"], client_ip, user_agent)
                     store_session(session_id, email_user["id"])
+                    
+                    # Log successful OAuth account linking and login
+                    audit_service.log_authentication_event(
+                        event_type=AuditEventType.OAUTH_ACCOUNT_LINKED,
+                        user_id=email_user["id"],
+                        email=email_user.get("email"),
+                        ip_address=client_ip,
+                        user_agent=user_agent,
+                        success=True,
+                        details={'provider': provider, 'linked_to_existing_account': True}
+                    )
+                    
+                    audit_service.log_authentication_event(
+                        event_type=AuditEventType.OAUTH_LOGIN_SUCCESS,
+                        user_id=email_user["id"],
+                        email=email_user.get("email"),
+                        ip_address=client_ip,
+                        user_agent=user_agent,
+                        session_id=session_id,
+                        success=True,
+                        details={'provider': provider, 'authentication_method': f'oauth_{provider}_linked'}
+                    )
                     
                     # Update login timestamp
                     db.update_user_login(email_user["id"], reset_failed_attempts=True)
@@ -1115,11 +1252,31 @@ def create_auth_routes(app, db, auth_service, email_service=None, csrf_protectio
                         ))
                     
                     # Create session and log new user in
-                    client_ip = request.client.host if hasattr(request, 'client') else None
-                    user_agent = request.headers.get('user-agent')
-                    
                     session_id = auth_service.create_session(db, user_id, client_ip, user_agent)
                     store_session(session_id, user_id)
+                    
+                    # Log user registration from OAuth
+                    audit_service.log_authentication_event(
+                        event_type=AuditEventType.USER_REGISTRATION,
+                        user_id=user_id,
+                        email=user_info.get("email"),
+                        ip_address=client_ip,
+                        user_agent=user_agent,
+                        success=True,
+                        details={'provider': provider, 'registration_method': f'oauth_{provider}'}
+                    )
+                    
+                    # Log successful OAuth login for new user
+                    audit_service.log_authentication_event(
+                        event_type=AuditEventType.OAUTH_LOGIN_SUCCESS,
+                        user_id=user_id,
+                        email=user_info.get("email"),
+                        ip_address=client_ip,
+                        user_agent=user_agent,
+                        session_id=session_id,
+                        success=True,
+                        details={'provider': provider, 'authentication_method': f'oauth_{provider}_new_user'}
+                    )
                     
                     # Update login timestamp
                     db.update_user_login(user_id, reset_failed_attempts=True)
@@ -1233,6 +1390,11 @@ def create_auth_routes(app, db, auth_service, email_service=None, csrf_protectio
     def two_factor_verify(request, token: str, verification_code: str, csrf_token: str = None):
         """Process 2FA verification"""
         try:
+            # Get audit service and client info
+            audit_service = get_audit_service(db)
+            client_ip = request.client.host if hasattr(request, 'client') else None
+            user_agent = request.headers.get('user-agent', '')
+            
             # Validate CSRF token if protection is enabled
             if csrf_protection:
                 session_id = request.cookies.get('session_id')
@@ -1266,6 +1428,16 @@ def create_auth_routes(app, db, auth_service, email_service=None, csrf_protectio
             
             # Verify the 2FA code
             if not two_fa.verify_2fa(user_id, verification_code):
+                # Log failed 2FA verification
+                audit_service.log_authentication_event(
+                    event_type=AuditEventType.TWO_FA_VERIFICATION_FAILED,
+                    user_id=user_id,
+                    ip_address=client_ip,
+                    user_agent=user_agent,
+                    success=False,
+                    details={'verification_method': 'totp_or_backup_code'}
+                )
+                
                 content = Div(
                     create_error_message("Invalid verification code. Please check your authenticator app or try a backup code."),
                     P(A("Try Again", href=f"/auth/2fa-verify?token={token}", cls="btn btn-primary"))
@@ -1293,11 +1465,31 @@ def create_auth_routes(app, db, auth_service, email_service=None, csrf_protectio
                 ))
             
             # Create session after successful 2FA verification
-            client_ip = request.client.host if hasattr(request, 'client') else None
-            user_agent = request.headers.get('user-agent', '')
-            
             session_id = auth_service.create_session(db, user['id'], client_ip, user_agent)
             store_session(session_id, user['id'])
+            
+            # Log successful 2FA verification and login
+            audit_service.log_authentication_event(
+                event_type=AuditEventType.TWO_FA_VERIFICATION_SUCCESS,
+                user_id=user['id'],
+                ip_address=client_ip,
+                user_agent=user_agent,
+                session_id=session_id,
+                success=True,
+                details={'verification_method': 'totp_or_backup_code'}
+            )
+            
+            # Also log the successful login completion
+            audit_service.log_authentication_event(
+                event_type=AuditEventType.USER_LOGIN_SUCCESS,
+                user_id=user['id'],
+                email=user.get('email'),
+                ip_address=client_ip,
+                user_agent=user_agent,
+                session_id=session_id,
+                success=True,
+                details={'authentication_method': '2fa'}
+            )
             
             # Update login timestamp
             db.update_user_login(user['id'], reset_failed_attempts=True)
