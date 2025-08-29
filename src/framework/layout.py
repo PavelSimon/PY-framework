@@ -146,10 +146,15 @@ def create_app_layout(
     # Minimal client-side theme application based on cookie or prefers-color-scheme
     theme_script = Script("""
     (function(){try{
-      var m=document.cookie.match(/(?:^|; )theme=([^;]+)/);
-      var t=m?decodeURIComponent(m[1]):'';
-      if(!t && window.matchMedia){t=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}
-      if(t==='dark'){document.documentElement.classList.add('theme-dark');}
+      var parts=(document.cookie||'').split(';');
+      var t='';
+      for(var i=0;i<parts.length;i++){
+        var p=parts[i].trim();
+        if(p.indexOf('theme=')===0){ t=decodeURIComponent(p.substring(6)); }
+      }
+      if(!t && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches){ t='dark'; }
+      var cls=document.documentElement.classList;
+      if(t==='dark'){ cls.add('theme-dark'); } else { cls.remove('theme-dark'); }
     }catch(e){}})();
     """)
 
@@ -178,10 +183,15 @@ def create_auth_layout(content, title: str = "PY-Framework", page_title: str = N
     # Minimal client-side theme application based on cookie or prefers-color-scheme
     theme_script = Script("""
     (function(){try{
-      var m=document.cookie.match(/(?:^|; )theme=([^;]+)/);
-      var t=m?decodeURIComponent(m[1]):'';
-      if(!t && window.matchMedia){t=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}
-      if(t==='dark'){document.documentElement.classList.add('theme-dark');}
+      var parts=(document.cookie||'').split(';');
+      var t='';
+      for(var i=0;i<parts.length;i++){
+        var p=parts[i].trim();
+        if(p.indexOf('theme=')===0){ t=decodeURIComponent(p.substring(6)); }
+      }
+      if(!t && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches){ t='dark'; }
+      var cls=document.documentElement.classList;
+      if(t==='dark'){ cls.add('theme-dark'); } else { cls.remove('theme-dark'); }
     }catch(e){}})();
     """)
 
