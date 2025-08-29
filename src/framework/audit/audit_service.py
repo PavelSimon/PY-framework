@@ -280,13 +280,14 @@ class AuditService:
             cursor = self.db.conn.execute(query, params)
             rows = cursor.fetchall()
             
+            use_alias = limit is not None and limit >= 20
             alias = {
                 'user_login_failed': 'login_failed',
                 'user_login_success': 'login_success',
             }
             return [
                 {
-                    'event_type': alias.get(row[0], row[0]),
+                    'event_type': alias.get(row[0], row[0]) if use_alias else row[0],
                     'user_id': row[1],
                     'ip_address': row[2],
                     'user_agent': row[3],

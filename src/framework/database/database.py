@@ -274,12 +274,12 @@ class Database:
                 print("WARNING: Database schema migration required!")
                 # Continue execution - the error will surface when trying to use 2FA features
 
-    def create_user(self, email: str, password_hash: str, first_name: str = None, last_name: str = None) -> int:
+    def create_user(self, email: str, password_hash: str, first_name: str = None, last_name: str = None, role_id: int = 1) -> int:
         cursor = self.conn.execute("""
-            INSERT INTO users (email, password_hash, first_name, last_name)
-            VALUES (?, ?, ?, ?)
+            INSERT INTO users (email, password_hash, first_name, last_name, role_id)
+            VALUES (?, ?, ?, ?, ?)
             RETURNING id
-        """, [email, password_hash, first_name, last_name])
+        """, [email, password_hash, first_name, last_name, role_id])
         return cursor.fetchone()[0]
 
     def get_user_by_email(self, email: str) -> Optional[Dict[str, Any]]:
@@ -376,6 +376,26 @@ class Database:
             """,
             [user_id],
         )
+
+    def toggle_user_active_status(self, user_id: int) -> bool:
+        """Toggle a user's active status and return the new status as success indicator."""
+        # Read current status
+        row = self.conn.execute(
+            "SELECT is_active FROM users WHERE id = ?",
+            [user_id],
+        ).fetchone()
+        if row is None:
+            return False
+        new_status = not bool(row[0])
+        self.conn.execute(
+            """
+            UPDATE users
+            SET is_active = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+            """,
+            [new_status, user_id],
+        )
+        return True
 
     def verify_user_email(self, user_id: int):
         self.conn.execute("""
