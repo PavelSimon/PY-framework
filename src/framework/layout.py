@@ -155,6 +155,35 @@ def create_app_layout(
       if(!t && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches){ t='dark'; }
       var cls=document.documentElement.classList;
       if(t==='dark'){ cls.add('theme-dark'); } else { cls.remove('theme-dark'); }
+
+      // Add/init a small navbar theme toggle
+      var initToggle=function(){
+        try{
+          var navRight=document.querySelector('.nav-right');
+          var btn=document.getElementById('theme-toggle');
+          if(!btn && navRight){
+            btn=document.createElement('button');
+            btn.id='theme-toggle';
+            btn.className='theme-toggle';
+            btn.type='button';
+            btn.title='Toggle theme';
+            btn.setAttribute('aria-label','Toggle theme');
+            navRight.insertBefore(btn, navRight.firstChild);
+          }
+          if(!btn) return;
+          var setIcon=function(){ btn.textContent = document.documentElement.classList.contains('theme-dark') ? '☀️' : '🌙'; };
+          setIcon();
+          btn.addEventListener('click', function(){
+            var cls=document.documentElement.classList;
+            var dark=cls.toggle('theme-dark');
+            document.cookie='theme='+(dark?'dark':'light')+'; Max-Age=31536000; Path=/; SameSite=Lax';
+            setIcon();
+          });
+        }catch(_e){}
+      };
+      if(document.readyState==='loading'){
+        document.addEventListener('DOMContentLoaded', initToggle);
+      } else { initToggle(); }
     }catch(e){}})();
     """)
 
@@ -192,6 +221,35 @@ def create_auth_layout(content, title: str = "PY-Framework", page_title: str = N
       if(!t && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches){ t='dark'; }
       var cls=document.documentElement.classList;
       if(t==='dark'){ cls.add('theme-dark'); } else { cls.remove('theme-dark'); }
+
+      // Add/init a small navbar theme toggle
+      var initToggle=function(){
+        try{
+          var navRight=document.querySelector('.nav-right');
+          var btn=document.getElementById('theme-toggle');
+          if(!btn && navRight){
+            btn=document.createElement('button');
+            btn.id='theme-toggle';
+            btn.className='theme-toggle';
+            btn.type='button';
+            btn.title='Toggle theme';
+            btn.setAttribute('aria-label','Toggle theme');
+            navRight.insertBefore(btn, navRight.firstChild);
+          }
+          if(!btn) return;
+          var setIcon=function(){ btn.textContent = document.documentElement.classList.contains('theme-dark') ? '☀️' : '🌙'; };
+          setIcon();
+          btn.addEventListener('click', function(){
+            var cls=document.documentElement.classList;
+            var dark=cls.toggle('theme-dark');
+            document.cookie='theme='+(dark?'dark':'light')+'; Max-Age=31536000; Path=/; SameSite=Lax';
+            setIcon();
+          });
+        }catch(_e){}
+      };
+      if(document.readyState==='loading'){
+        document.addEventListener('DOMContentLoaded', initToggle);
+      } else { initToggle(); }
     }catch(e){}})();
     """)
 

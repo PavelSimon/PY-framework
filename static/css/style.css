@@ -1076,3 +1076,25 @@ li {
         gap: 0.25rem;
     }
 }
+
+/* Navbar Theme Toggle */
+.theme-toggle {
+    background: transparent;
+    border: 1px solid var(--border-color);
+    color: var(--text-color);
+    padding: 0.35rem 0.6rem;
+    border-radius: 999px;
+    font-size: 0.95rem;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: var(--shadow);
+}
+
+.theme-toggle:hover {
+    background: var(--surface-color);
+}
+
+.top-navbar .theme-toggle { margin-right: 0.5rem; }
