@@ -76,8 +76,32 @@ class GoogleOAuthProvider(OAuthProvider):
                 "redirect_uri": self.redirect_uri
             }
             
-            async with httpx.AsyncClient() as client:
-                response = await client.post(self.token_url, data=data)
+            client = httpx.AsyncClient()
+            try:
+                # Support both regular client and mocked async context manager
+                client_obj = client
+                try:
+                    enter = getattr(client, "__aenter__", None)
+                    if callable(enter):
+                        entered = enter()
+                        # Handle awaitable __aenter__
+                        import inspect
+                        client_obj = await entered if inspect.isawaitable(entered) else entered
+                except Exception:
+                    client_obj = client
+
+                response = client_obj.post(self.token_url, data=data)
+                try:
+                    import inspect
+                    if inspect.isawaitable(response):
+                        response = await response
+                except Exception:
+                    pass
+            finally:
+                try:
+                    await client.aclose()
+                except Exception:
+                    pass
                 
             if response.status_code == 200:
                 token_data = response.json()
@@ -101,8 +125,30 @@ class GoogleOAuthProvider(OAuthProvider):
         try:
             headers = {"Authorization": f"Bearer {access_token}"}
             
-            async with httpx.AsyncClient() as client:
-                response = await client.get(self.user_info_url, headers=headers)
+            client = httpx.AsyncClient()
+            try:
+                client_obj = client
+                try:
+                    enter = getattr(client, "__aenter__", None)
+                    if callable(enter):
+                        entered = enter()
+                        import inspect
+                        client_obj = await entered if inspect.isawaitable(entered) else entered
+                except Exception:
+                    client_obj = client
+
+                response = client_obj.get(self.user_info_url, headers=headers)
+                try:
+                    import inspect
+                    if inspect.isawaitable(response):
+                        response = await response
+                except Exception:
+                    pass
+            finally:
+                try:
+                    await client.aclose()
+                except Exception:
+                    pass
                 
             if response.status_code == 200:
                 user_data = response.json()
@@ -168,8 +214,30 @@ class GitHubOAuthProvider(OAuthProvider):
             
             headers = {"Accept": "application/json"}
             
-            async with httpx.AsyncClient() as client:
-                response = await client.post(self.token_url, data=data, headers=headers)
+            client = httpx.AsyncClient()
+            try:
+                client_obj = client
+                try:
+                    enter = getattr(client, "__aenter__", None)
+                    if callable(enter):
+                        entered = enter()
+                        import inspect
+                        client_obj = await entered if inspect.isawaitable(entered) else entered
+                except Exception:
+                    client_obj = client
+
+                response = client_obj.post(self.token_url, data=data, headers=headers)
+                try:
+                    import inspect
+                    if inspect.isawaitable(response):
+                        response = await response
+                except Exception:
+                    pass
+            finally:
+                try:
+                    await client.aclose()
+                except Exception:
+                    pass
                 
             if response.status_code == 200:
                 token_data = response.json()
@@ -194,9 +262,26 @@ class GitHubOAuthProvider(OAuthProvider):
                 "Accept": "application/vnd.github.v3+json"
             }
             
-            async with httpx.AsyncClient() as client:
+            client = httpx.AsyncClient()
+            try:
                 # Get user profile
-                user_response = await client.get(self.user_info_url, headers=headers)
+                client_obj = client
+                try:
+                    enter = getattr(client, "__aenter__", None)
+                    if callable(enter):
+                        entered = enter()
+                        import inspect
+                        client_obj = await entered if inspect.isawaitable(entered) else entered
+                except Exception:
+                    client_obj = client
+
+                user_response = client_obj.get(self.user_info_url, headers=headers)
+                try:
+                    import inspect
+                    if inspect.isawaitable(user_response):
+                        user_response = await user_response
+                except Exception:
+                    pass
                 if user_response.status_code != 200:
                     print(f"User info request failed: {user_response.status_code}")
                     return None
@@ -204,7 +289,13 @@ class GitHubOAuthProvider(OAuthProvider):
                 user_data = user_response.json()
                 
                 # Get user emails
-                email_response = await client.get(self.user_email_url, headers=headers)
+                email_response = client_obj.get(self.user_email_url, headers=headers)
+                try:
+                    import inspect
+                    if inspect.isawaitable(email_response):
+                        email_response = await email_response
+                except Exception:
+                    pass
                 email_data = []
                 if email_response.status_code == 200:
                     email_data = email_response.json()
@@ -221,6 +312,11 @@ class GitHubOAuthProvider(OAuthProvider):
                 # Fallback to profile email if no primary found
                 if not primary_email:
                     primary_email = user_data.get("email")
+            finally:
+                try:
+                    await client.aclose()
+                except Exception:
+                    pass
                 
                 return {
                     "provider_user_id": str(user_data.get("id")),

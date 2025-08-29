@@ -13,6 +13,40 @@ from .config import settings
 from .utils.rate_limit import RequestRateLimiter
 
 
+class RateLimiter:
+    """Simple per-minute and per-hour rate limiter with test-friendly API."""
+
+    def __init__(self, requests_per_minute: int = 60, requests_per_hour: int = 1000):
+        from collections import defaultdict, deque
+        self.requests_per_minute = requests_per_minute
+        self.requests_per_hour = requests_per_hour
+        self._minute = defaultdict(deque)
+        self._hour = defaultdict(deque)
+
+    def is_allowed(self, identifier: str) -> bool:
+        from time import time
+        now = time()
+        minute_window = now - 60
+        hour_window = now - 3600
+
+        mq = self._minute[identifier]
+        hq = self._hour[identifier]
+
+        while mq and mq[0] < minute_window:
+            mq.popleft()
+        while hq and hq[0] < hour_window:
+            hq.popleft()
+
+        if len(mq) >= self.requests_per_minute:
+            return False
+        if len(hq) >= self.requests_per_hour:
+            return False
+
+        mq.append(now)
+        hq.append(now)
+        return True
+
+
  
 
 

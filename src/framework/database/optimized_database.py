@@ -7,6 +7,7 @@ import time
 import threading
 from typing import Any, Dict, List, Optional, Tuple
 from datetime import datetime, timedelta
+import secrets
 from contextlib import contextmanager
 from ..performance import (
     cached_query,
@@ -109,6 +110,37 @@ class OptimizedDatabase(Database):
                 "role_name": row[10], "role_description": row[11]
             }
         return None
+
+    @cached_query(cache=get_performance_cache(), ttl=300)
+    def get_user_by_id(self, user_id: int) -> Optional[Dict[str, Any]]:
+        """Get user by ID with caching"""
+        row = self.execute_query(
+            """
+            SELECT id, email, password_hash, first_name, last_name,
+                   is_active, is_verified, created_at, updated_at,
+                   last_login, failed_login_attempts, locked_until
+            FROM users WHERE id = ?
+            """,
+            [user_id],
+            fetch_one=True,
+            fetch_all=False,
+        )
+        if row:
+            return {
+                "id": row[0],
+                "email": row[1],
+                "password_hash": row[2],
+                "first_name": row[3],
+                "last_name": row[4],
+                "is_active": row[5],
+                "is_verified": row[6],
+                "created_at": row[7],
+                "updated_at": row[8],
+                "last_login": row[9],
+                "failed_login_attempts": row[10],
+                "locked_until": row[11],
+            }
+        return None
     
     def get_session_cached(self, session_id: str) -> Optional[Dict[str, Any]]:
         """Get session with in-memory caching"""
@@ -127,7 +159,9 @@ class OptimizedDatabase(Database):
     
     def create_session_cached(self, user_id: int, ip_address: str = None, user_agent: str = None) -> str:
         """Create session with caching"""
-        session_id = self.create_session(user_id, ip_address, user_agent)
+        session_id = secrets.token_urlsafe(32)
+        expires_at = datetime.now() + timedelta(hours=24)
+        self.create_session(session_id, user_id, expires_at, ip_address, user_agent)
         
         # Cache the new session
         session_data = {

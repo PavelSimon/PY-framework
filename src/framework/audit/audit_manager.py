@@ -12,15 +12,25 @@ class AuditManager:
     @classmethod
     def get_instance(cls, database: Optional[Database] = None) -> AuditService:
         """Get or create audit service instance"""
+        # Initialize if missing
         if cls._instance is None:
             if database is None:
                 raise ValueError("Database instance required for first initialization")
-            
-            cls._instance = AuditService(
-                database=database,
-                log_file_path=settings.audit_log_file
-            )
-        
+            cls._instance = AuditService(database=database, log_file_path=settings.audit_log_file)
+            return cls._instance
+
+        # If a database is provided and differs from the current one, reinitialize
+        if database is not None and cls._instance.db is not database:
+            cls._instance = AuditService(database=database, log_file_path=settings.audit_log_file)
+            return cls._instance
+
+        # Ensure underlying connection is healthy (auto-reconnect handled by Database)
+        try:
+            _ = cls._instance.db.conn  # triggers auto-reconnect if needed
+        except Exception:
+            # If anything goes wrong, and a database was provided, rebuild; otherwise reuse existing db
+            target_db = database or cls._instance.db
+            cls._instance = AuditService(database=target_db, log_file_path=settings.audit_log_file)
         return cls._instance
     
     @classmethod

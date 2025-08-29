@@ -4,7 +4,11 @@ from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
 from pathlib import Path
 import time
+import threading
 from ..performance import QueryOptimizer
+
+# Track last instantiated Database to support optional-DB APIs
+_LAST_DB_INSTANCE = None
 
 
 class Database:
@@ -12,15 +16,48 @@ class Database:
         self.db_path = db_path
         self._conn = None
         self._query_optimizer = QueryOptimizer()
+        self._tls = threading.local()
+        global _LAST_DB_INSTANCE
+        if _LAST_DB_INSTANCE is None:
+            _LAST_DB_INSTANCE = self
+        else:
+            # Prefer non-default paths as active default; avoid overriding a specific DB
+            # with a generic 'app.db' used by internal services.
+            if self.db_path != "app.db":
+                _LAST_DB_INSTANCE = self
+            else:
+                try:
+                    current_path = getattr(_LAST_DB_INSTANCE, "db_path", None)
+                except Exception:
+                    current_path = None
+                if current_path is None or current_path == "app.db":
+                    _LAST_DB_INSTANCE = self
         
     @property
     def conn(self):
-        """Lazy initialization of database connection"""
-        if self._conn is None:
+        """Thread-local database connection with auto-reconnect."""
+        local_conn = getattr(self._tls, "conn", None)
+        needs_init = False
+        if local_conn is None:
+            needs_init = True
+        else:
+            try:
+                if getattr(local_conn, "closed", False):
+                    needs_init = True
+                else:
+                    local_conn.execute("SELECT 1")
+            except Exception:
+                needs_init = True
+
+        if needs_init:
             raw = duckdb.connect(self.db_path)
-            self._conn = _ConnectionWrapper(raw, self._query_optimizer)
+            wrapper = _ConnectionWrapper(raw, self._query_optimizer)
+            self._tls.conn = wrapper
+            if self._conn is None:
+                self._conn = wrapper
             self._init_schema()
-        return self._conn
+            return wrapper
+        return local_conn
     
     def _init_schema(self):
         # Basic migrations tracking table
@@ -331,6 +368,23 @@ class Database:
                 WHERE id = ?
             """, [user_id])
 
+    def update_user_profile(self, user_id: int, first_name: Optional[str] = None, last_name: Optional[str] = None) -> bool:
+        """Update mutable user profile fields."""
+        fields = []
+        params = []
+        if first_name is not None:
+            fields.append("first_name = ?")
+            params.append(first_name)
+        if last_name is not None:
+            fields.append("last_name = ?")
+            params.append(last_name)
+        if not fields:
+            return False
+        set_clause = ", ".join(fields) + ", updated_at = CURRENT_TIMESTAMP"
+        params.append(user_id)
+        self.conn.execute(f"UPDATE users SET {set_clause} WHERE id = ?", params)
+        return True
+
     def increment_failed_login(self, user_id: int, lock_duration_minutes: int = 30):
         # First get current attempts
         cursor = self.conn.execute("""
@@ -410,6 +464,10 @@ class Database:
             INSERT INTO sessions (id, user_id, expires_at, ip_address, user_agent)
             VALUES (?, ?, ?, ?, ?)
         """, [session_id, user_id, expires_at, ip_address, user_agent])
+        try:
+            self.conn.execute("COMMIT")
+        except Exception:
+            pass
 
     def get_session(self, session_id: str) -> Optional[Dict[str, Any]]:
         cursor = self.conn.execute("""
@@ -433,12 +491,43 @@ class Database:
             UPDATE sessions SET is_active = FALSE WHERE id = ?
         """, [session_id])
 
-    def cleanup_expired_sessions(self):
-        self.conn.execute("""
+    def invalidate_user_sessions(self, user_id: int):
+        """Invalidate all active sessions for a user."""
+        self.conn.execute(
+            "UPDATE sessions SET is_active = FALSE WHERE user_id = ? AND is_active = TRUE",
+            [user_id],
+        )
+
+    def cleanup_expired_sessions(self) -> int:
+        """Mark expired sessions inactive and return count cleaned."""
+        try:
+            count_row = self.conn.execute(
+                "SELECT COUNT(*) FROM sessions WHERE expires_at < CURRENT_TIMESTAMP AND is_active = TRUE"
+            ).fetchone()
+            count = int(count_row[0]) if count_row else 0
+        except Exception:
+            count = 0
+        self.conn.execute(
+            """
             UPDATE sessions 
             SET is_active = FALSE 
             WHERE expires_at < CURRENT_TIMESTAMP AND is_active = TRUE
-        """)
+            """
+        )
+        try:
+            self.conn.execute("COMMIT")
+        except Exception:
+            pass
+        return count
+
+    def delete_session(self, session_id: str) -> bool:
+        """Delete a session by ID."""
+        self.conn.execute("DELETE FROM sessions WHERE id = ?", [session_id])
+        try:
+            self.conn.execute("COMMIT")
+        except Exception:
+            pass
+        return True
 
     def create_oauth_account(self, user_id: int, provider: str, provider_user_id: str,
                            provider_email: str = None, access_token: str = None,
@@ -907,8 +996,17 @@ class Database:
             return False
 
     def close(self):
-        if self.conn:
-            self.conn.close()
+        try:
+            local_conn = getattr(self._tls, "conn", None)
+            if local_conn:
+                local_conn.close()
+        except Exception:
+            pass
+
+
+def get_default_database() -> Optional["Database"]:
+    """Return the most recently created Database instance, if any."""
+    return _LAST_DB_INSTANCE
 
 
 class _ConnectionWrapper:
@@ -917,27 +1015,38 @@ class _ConnectionWrapper:
     def __init__(self, raw_conn: duckdb.DuckDBPyConnection, optimizer: QueryOptimizer):
         self._raw = raw_conn
         self._optimizer = optimizer
+        self._closed = False
+        self._lock = threading.RLock()
 
     def execute(self, query: str, params: Optional[list] = None):
         start = time.time()
-        try:
-            if params is None:
-                result = self._raw.execute(query)
-            else:
-                result = self._raw.execute(query, params)
-            return result
-        finally:
-            duration = time.time() - start
+        with self._lock:
             try:
-                self._optimizer.track_query(query, duration)
-            except Exception:
-                pass
+                # Translate common SQLite date/time syntax to DuckDB equivalents
+                if query and "datetime('now', '-1 day')" in query:
+                    query = query.replace("datetime('now', '-1 day')", "(CURRENT_TIMESTAMP - INTERVAL '1 day')")
+                if params is None:
+                    result = self._raw.execute(query)
+                else:
+                    result = self._raw.execute(query, params)
+                return result
+            finally:
+                duration = time.time() - start
+                try:
+                    self._optimizer.track_query(query, duration)
+                except Exception:
+                    pass
 
     def close(self):
         try:
             self._raw.close()
+            self._closed = True
         except Exception:
             pass
 
     def __getattr__(self, name):
         return getattr(self._raw, name)
+
+    @property
+    def closed(self) -> bool:
+        return self._closed

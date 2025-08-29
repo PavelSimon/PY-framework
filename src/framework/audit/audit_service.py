@@ -97,9 +97,39 @@ class AuditService:
         except Exception as e:
             self.logger.error(f"Failed to initialize audit tables: {e}")
     
-    def log_event(self, event: AuditEvent):
-        """Log an audit event to both database and log file"""
+    def log_event(self, event: Optional[AuditEvent] = None, **kwargs):
+        """Log an audit event to both database and log file.
+
+        Supports either passing an AuditEvent instance or keyword arguments
+        such as event_type, user_id, ip_address, user_agent, session_id, details, success, timestamp.
+        Also accepts shorthand event_type aliases like 'LOGIN_SUCCESS'/'LOGIN_FAILED'.
+        """
         try:
+            if event is None:
+                # Map shorthand aliases
+                et = kwargs.get("event_type")
+                if isinstance(et, str):
+                    alias_map = {
+                        "LOGIN_SUCCESS": AuditEventType.USER_LOGIN_SUCCESS,
+                        "LOGIN_FAILED": AuditEventType.USER_LOGIN_FAILED,
+                    }
+                    et = alias_map.get(et, AuditEventType(et.lower())) if et.isupper() else AuditEventType(et)
+                elif isinstance(et, AuditEventType):
+                    pass
+                else:
+                    raise ValueError("event_type is required")
+
+                event = AuditEvent(
+                    event_type=et,
+                    user_id=kwargs.get("user_id"),
+                    ip_address=kwargs.get("ip_address"),
+                    user_agent=kwargs.get("user_agent"),
+                    session_id=kwargs.get("session_id"),
+                    details=kwargs.get("details"),
+                    success=kwargs.get("success", True),
+                    timestamp=kwargs.get("timestamp"),
+                )
+
             # Log to database
             details_json = json.dumps(event.details) if event.details else None
             

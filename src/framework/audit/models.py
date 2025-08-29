@@ -9,6 +9,9 @@ class AuditEventType(Enum):
     # Authentication Events
     USER_LOGIN_SUCCESS = "user_login_success"
     USER_LOGIN_FAILED = "user_login_failed"
+    # Aliases for convenience
+    LOGIN_SUCCESS = "user_login_success"
+    LOGIN_FAILED = "user_login_failed"
     USER_LOGOUT = "user_logout"
     USER_REGISTRATION = "user_registration"
     EMAIL_VERIFICATION = "email_verification"
