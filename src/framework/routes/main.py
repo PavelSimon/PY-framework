@@ -188,9 +188,35 @@ def create_main_routes(app, db=None, auth_service=None, is_development=False, cs
             session_id = request.cookies.get('session_id')
             form_elements.insert(0, csrf_protection.create_csrf_input(session_id))
         
+        # Theme controls
+        current_theme = request.cookies.get('theme') or 'light'
+
         form_elements.extend([
             Button("Update Profile", type="submit", cls="btn btn-primary"),
-            A("Change Password", href="/profile/change-password", cls="btn btn-secondary")
+            A("Change Password", href="/profile/change-password", cls="btn btn-secondary"),
+            Hr(),
+            H4("Theme"),
+            Form(
+                Div(
+                    Label("Choose theme:", fr="theme"),
+                    Div(
+                        Label(
+                            Input(type="radio", name="theme", value="light", checked=current_theme != 'dark'),
+                            Span(" Light")
+                        ),
+                        Label(
+                            Input(type="radio", name="theme", value="dark", checked=current_theme == 'dark'),
+                            Span(" Dark")
+                        ),
+                        cls="button-group"
+                    ),
+                    cls="form-group"
+                ),
+                Button("Save Theme", type="submit", cls="btn btn-secondary"),
+                action="/settings/theme",
+                method="post",
+                cls="form"
+            )
         ])
         
         # Get 2FA status for the user
