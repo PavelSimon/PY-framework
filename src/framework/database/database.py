@@ -3,22 +3,45 @@ import os
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
 from pathlib import Path
+import time
+from ..performance import QueryOptimizer
 
 
 class Database:
     def __init__(self, db_path: str = "app.db"):
         self.db_path = db_path
         self._conn = None
+        self._query_optimizer = QueryOptimizer()
         
     @property
     def conn(self):
         """Lazy initialization of database connection"""
         if self._conn is None:
-            self._conn = duckdb.connect(self.db_path)
+            raw = duckdb.connect(self.db_path)
+            self._conn = _ConnectionWrapper(raw, self._query_optimizer)
             self._init_schema()
         return self._conn
     
     def _init_schema(self):
+        # Basic migrations tracking table
+        self._conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS schema_migrations (
+                id INTEGER PRIMARY KEY,
+                name VARCHAR UNIQUE NOT NULL,
+                applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+        # Seed initial migration marker if empty
+        try:
+            res = self._conn.execute("SELECT COUNT(*) FROM schema_migrations").fetchone()
+            if res and int(res[0]) == 0:
+                self._conn.execute(
+                    "INSERT INTO schema_migrations (id, name) VALUES (1, '0001_initial')"
+                )
+        except Exception:
+            pass
         # Create sequences for auto-incrementing IDs
         self._conn.execute("CREATE SEQUENCE IF NOT EXISTS user_id_seq START 1;")
         self._conn.execute("CREATE SEQUENCE IF NOT EXISTS oauth_id_seq START 1;")
@@ -79,7 +102,7 @@ class Database:
                 refresh_token VARCHAR,
                 expires_at TIMESTAMP,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (user_id) REFERENCES users(id),
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
                 UNIQUE(provider, provider_user_id)
             )
         """)
@@ -93,7 +116,7 @@ class Database:
                 ip_address VARCHAR,
                 user_agent VARCHAR,
                 is_active BOOLEAN DEFAULT TRUE,
-                FOREIGN KEY (user_id) REFERENCES users(id)
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
             )
         """)
         
@@ -105,7 +128,7 @@ class Database:
                 expires_at TIMESTAMP NOT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 used_at TIMESTAMP,
-                FOREIGN KEY (user_id) REFERENCES users(id)
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
             )
         """)
         
@@ -117,7 +140,7 @@ class Database:
                 expires_at TIMESTAMP NOT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 used_at TIMESTAMP,
-                FOREIGN KEY (user_id) REFERENCES users(id)
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
             )
         """)
         
@@ -175,7 +198,7 @@ class Database:
                 secret VARCHAR NOT NULL,
                 enabled BOOLEAN DEFAULT TRUE,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (user_id) REFERENCES users(id),
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
                 UNIQUE(user_id)
             )
         """)
@@ -187,7 +210,7 @@ class Database:
                 code_hash VARCHAR NOT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 used_at TIMESTAMP,
-                FOREIGN KEY (user_id) REFERENCES users(id)
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
             )
         """)
         
@@ -198,7 +221,7 @@ class Database:
                 token VARCHAR UNIQUE NOT NULL,
                 expires_at TIMESTAMP NOT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (user_id) REFERENCES users(id)
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
             )
         """)
         
@@ -853,3 +876,35 @@ class Database:
     def close(self):
         if self.conn:
             self.conn.close()
+
+
+class _ConnectionWrapper:
+    """Lightweight wrapper to instrument DuckDB connection execute() calls."""
+
+    def __init__(self, raw_conn: duckdb.DuckDBPyConnection, optimizer: QueryOptimizer):
+        self._raw = raw_conn
+        self._optimizer = optimizer
+
+    def execute(self, query: str, params: Optional[list] = None):
+        start = time.time()
+        try:
+            if params is None:
+                result = self._raw.execute(query)
+            else:
+                result = self._raw.execute(query, params)
+            return result
+        finally:
+            duration = time.time() - start
+            try:
+                self._optimizer.track_query(query, duration)
+            except Exception:
+                pass
+
+    def close(self):
+        try:
+            self._raw.close()
+        except Exception:
+            pass
+
+    def __getattr__(self, name):
+        return getattr(self._raw, name)

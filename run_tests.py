@@ -110,19 +110,27 @@ def run_all_tests():
 
 def run_coverage_tests():
     """Run tests with coverage report"""
-    # First install coverage if needed
-    install_cmd = ["uv", "add", "--dev", "pytest-cov"]
-    run_command(install_cmd, "Installing coverage tools")
-    
-    cmd = [
-        "uv", "run", "pytest", 
-        "tests/",
-        "--cov=src/framework",
-        "--cov-report=html",
-        "--cov-report=term-missing",
-        "-v"
-    ]
-    return run_command(cmd, "Coverage Tests")
+    # Try to run with coverage if plugin is available; otherwise fallback
+    has_cov = subprocess.run(
+        ["uv", "run", "python", "-c", "import pytest_cov"], capture_output=True
+    ).returncode == 0
+
+    if has_cov:
+        cmd = [
+            "uv", "run", "pytest",
+            "tests/",
+            "--cov=src/framework",
+            "--cov-report=term-missing",
+            "-v",
+        ]
+        return run_command(cmd, "Coverage Tests (with pytest-cov)")
+    else:
+        cmd = [
+            "uv", "run", "pytest",
+            "tests/",
+            "-v",
+        ]
+        return run_command(cmd, "Tests (pytest-cov not available)")
 
 
 def run_specific_test(test_pattern):

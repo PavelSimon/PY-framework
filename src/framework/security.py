@@ -9,6 +9,7 @@ from typing import Dict, Any, Tuple, Optional
 from datetime import datetime, timedelta
 from collections import deque
 from fasthtml.common import *
+from .config import settings
 from .utils.rate_limit import RequestRateLimiter
 
 
@@ -219,6 +220,21 @@ def create_security_config(is_production: bool = False) -> SecurityConfig:
             enable_hsts=False,  # No HSTS in development
             enable_security_headers=True
         )
+
+
+def create_security_config_from_settings() -> SecurityConfig:
+    """Create SecurityConfig based on global settings (preferred for app wiring)."""
+    # Map settings to security behavior
+    strict = not settings.debug
+    return SecurityConfig(
+        enable_rate_limiting=True,
+        rate_limit_requests=getattr(settings, "rate_limit_requests", 100),
+        rate_limit_window=getattr(settings, "rate_limit_window_minutes", 15) * 60,
+        enable_strict_csp=strict,
+        enable_hsts=strict,
+        hsts_max_age=31536000 if strict else 0,
+        enable_security_headers=True,
+    )
 
 
 class SecurityReporter:
