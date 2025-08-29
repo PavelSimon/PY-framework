@@ -8,7 +8,7 @@
 
 ## Security
 - CSP hardening: Current policy allows `'unsafe-inline'`. Prefer per‑request nonces or hashes for scripts/styles and inject via templates; keep relaxed in dev via settings. — DONE
-- CSRF storage: In‑memory token store is single‑process only. Back with DuckDB table (or Redis in prod), scope to session/user, and rotate/expire reliably. Make the decorator async‑aware.
+- CSRF storage: In‑memory token store is single‑process only. Back with DuckDB table (or Redis in prod), scope to session/user, and rotate/expire reliably. Make the decorator async‑aware. — DONE
 - Cookies: Ensure session cookies set `Secure`, `HttpOnly`, `SameSite=Strict/Lax` centrally (likely in login/session creation flow).
 - Secrets: Encourage explicit `SECRET_KEY` through `.env` (random default complicates restarts). Fail fast if missing in production.
 

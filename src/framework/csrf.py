@@ -38,8 +38,8 @@ class CSRFProtection:
             hashlib.sha256
         ).hexdigest()
         
-        # Combine token data and signature
-        full_token = f"{token_data}|{signature}"
+        # Combine token data and signature using dot separator for signed payloads
+        full_token = f"{token_data}.{signature}"
         
         # Persist token
         self._storage.save(
@@ -59,22 +59,30 @@ class CSRFProtection:
             if not token:
                 return False
             
-            # Split token parts using pipe separator
-            parts = token.split('|')
-            if len(parts) < 3:
-                return False
-            
+            # Expect dot-separated signature: <token_data>.<signature>
+            if '.' in token:
+                token_data, signature = token.rsplit('.', 1)
+                parts = token_data.split('|')
+            else:
+                # Backwards-compat: legacy pipe-separated signature
+                parts = token.split('|')
+                if len(parts) < 3:
+                    return False
+                # Reconstruct token_data without trailing signature part
+                token_data = '|'.join(parts[:-1])
+                signature = parts[-1]
+
             # Extract components based on whether session was used during generation
-            if len(parts) == 4:
+            if len(parts) == 2:
+                # Token without session ID
+                random_token, timestamp = parts[0], parts[1]
+            elif len(parts) == 3:
                 # Token includes session ID
-                token_session_id, random_token, timestamp, signature = parts
+                token_session_id, random_token, timestamp = parts[0], parts[1], parts[2]
                 if session_id and token_session_id != session_id:
                     return False
-                token_data = f"{token_session_id}|{random_token}|{timestamp}"
             else:
-                # Token without session ID
-                random_token, timestamp, signature = parts
-                token_data = f"{random_token}|{timestamp}"
+                return False
             
             # Verify signature
             expected_signature = hmac.new(
@@ -91,11 +99,11 @@ class CSRFProtection:
             if not token_rec:
                 return False
             
-            if token_rec.used and consume:
+            if token_rec['used']:
                 return False
             
             # Check token expiration
-            token_age = datetime.now() - token_rec.created_at
+            token_age = datetime.now() - token_rec['created_at']
             if token_age > self.token_lifetime:
                 # Remove expired token
                 self._storage.delete(random_token)
@@ -115,6 +123,13 @@ class CSRFProtection:
         """Remove expired tokens from storage"""
         current_time = datetime.now()
         self._storage.cleanup_expired(current_time - self.token_lifetime)
+
+    # Backwards-compat: expose legacy in-memory dict when using InMemory storage
+    @property
+    def _active_tokens(self):
+        if hasattr(self._storage, "_store"):
+            return self._storage._store
+        return {}
     
     def create_csrf_input(self, session_id: str = None) -> Input:
         """Create a hidden input field with CSRF token"""
