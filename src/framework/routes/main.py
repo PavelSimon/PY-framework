@@ -898,6 +898,42 @@ def create_main_routes(app, db=None, auth_service=None, is_development=False, cs
             cls="settings-container"
         )
         
+        # Append Appearance settings section
+        current_theme = request.cookies.get('theme') or 'light'
+        appearance_section = Div(
+            H2("Appearance"),
+            Div(
+                Div(
+                    H4("Theme"),
+                    Form(
+                        Div(
+                            Label("Choose theme:", fr="theme"),
+                            Div(
+                                Label(
+                                    Input(type="radio", name="theme", value="light", checked=current_theme != 'dark'),
+                                    Span(" Light")
+                                ),
+                                Label(
+                                    Input(type="radio", name="theme", value="dark", checked=current_theme == 'dark'),
+                                    Span(" Dark")
+                                ),
+                                cls="button-group"
+                            ),
+                            cls="form-group"
+                        ),
+                        Button("Save Theme", type="submit", cls="btn btn-primary"),
+                        action="/settings/theme",
+                        method="post",
+                        cls="form"
+                    ),
+                    cls="settings-card"
+                ),
+                cls="settings-grid"
+            ),
+            cls="settings-section"
+        )
+        content = Div(content, appearance_section, cls="settings-container")
+
         return Titled("Settings", create_app_layout(
             content, 
             user=user, 
@@ -905,6 +941,14 @@ def create_main_routes(app, db=None, auth_service=None, is_development=False, cs
             page_title="Settings",
             page_subtitle="Manage your account preferences and security settings"
         ))
+
+    @app.post("/settings/theme")
+    def set_theme(request, theme: str = 'light'):
+        theme = theme if theme in ('light', 'dark') else 'light'
+        resp = RedirectResponse("/settings", status_code=302)
+        cookie = f"theme={theme}; Path=/; Max-Age=31536000; SameSite=Lax"
+        resp.headers["Set-Cookie"] = cookie
+        return resp
     
     @app.get("/users/{user_id:int}/edit-role")
     def edit_user_role_page(request, user_id: int):

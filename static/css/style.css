@@ -17,6 +17,27 @@
     --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
 }
 
+/* Dark theme overrides using CSS variables */
+.theme-dark {
+    --primary-color: #60a5fa;
+    --primary-hover: #3b82f6;
+    --secondary-color: #94a3b8;
+    --success-color: #22c55e;
+    --danger-color: #ef4444;
+    --warning-color: #f59e0b;
+    --background-color: #0f172a; /* slate-900 */
+    --surface-color: #111827;    /* gray-900 */
+    --text-color: #e5e7eb;       /* gray-200 */
+    --text-muted: #9ca3af;       /* gray-400 */
+    --border-color: #1f2937;     /* gray-800 */
+    --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.5), 0 1px 2px -1px rgb(0 0 0 / 0.4);
+    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.6), 0 4px 6px -4px rgb(0 0 0 / 0.5);
+}
+
+.theme-dark .alert-success { background-color: #052e16; border-color: #14532d; }
+.theme-dark .alert-danger { background-color: #3f1d1d; border-color: #7f1d1d; }
+.theme-dark .card-header { background-color: #0b1220; }
+
 * {
     box-sizing: border-box;
     margin: 0;

@@ -143,8 +143,18 @@ def create_app_layout(
             cls="main-content"
         )
     
+    # Minimal client-side theme application based on cookie or prefers-color-scheme
+    theme_script = Script("""
+    (function(){try{
+      var m=document.cookie.match(/(?:^|; )theme=([^;]+)/);
+      var t=m?decodeURIComponent(m[1]):'';
+      if(!t && window.matchMedia){t=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}
+      if(t==='dark'){document.documentElement.classList.add('theme-dark');}
+    }catch(e){}})();
+    """)
+
     # Build layout with optional title section
-    layout_elements = [navbar]
+    layout_elements = [theme_script, navbar]
     if title_section:
         layout_elements.append(title_section)
     layout_elements.append(main_content)
@@ -165,8 +175,18 @@ def create_auth_layout(content, title: str = "PY-Framework", page_title: str = N
             cls="page-title-section"
         )
     
+    # Minimal client-side theme application based on cookie or prefers-color-scheme
+    theme_script = Script("""
+    (function(){try{
+      var m=document.cookie.match(/(?:^|; )theme=([^;]+)/);
+      var t=m?decodeURIComponent(m[1]):'';
+      if(!t && window.matchMedia){t=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}
+      if(t==='dark'){document.documentElement.classList.add('theme-dark');}
+    }catch(e){}})();
+    """)
+
     # Build layout with optional title section
-    layout_elements = [navbar]
+    layout_elements = [theme_script, navbar]
     if title_section:
         layout_elements.append(title_section)
     layout_elements.append(
