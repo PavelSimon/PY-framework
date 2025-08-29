@@ -38,3 +38,6 @@
 ## Documentation & Configuration
 - Centralize settings: Map security toggles (CSP strictness, HSTS, rate limit window) to `Settings` in `config.py` and read in middleware constructors. — DONE (added helper)
 - Examples: Provide minimal `.env.example` with required keys and clearly marked optional sections (OAuth/SMTP).
+
+> Last updated: 2025-08-29
+> Recent internal changes: DB connections (thread-local + auto-reconnect), audit logging stability, OAuth async mocking compatibility, session rotation/cleanup, simple test RateLimiter, and pytest asyncio config.

@@ -126,3 +126,6 @@ A formal release process ensures that new versions of the framework are released
     *   Creating a release on GitHub.
     *   (Optional) Publishing the package to a package registry like PyPI.
     *   **Recommended Tool:** `python-semantic-release` can automate much of this workflow.
+
+> Last updated: 2025-08-29
+> Recent internal changes: DB connections (thread-local + auto-reconnect), audit logging stability, OAuth async mocking compatibility, session rotation/cleanup, simple test RateLimiter, and pytest asyncio config.

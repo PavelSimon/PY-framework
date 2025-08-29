@@ -186,3 +186,6 @@ uv run pytest
 uv run pytest --maxfail=1 --disable-warnings -q --cov=src/framework
 ```
 
+> Last updated: 2025-08-29
+> Recent internal changes: DB connections (thread-local + auto-reconnect), audit logging stability, OAuth async mocking compatibility, session rotation/cleanup, simple test RateLimiter, and pytest asyncio config.
+

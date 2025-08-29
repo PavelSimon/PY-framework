@@ -508,3 +508,6 @@ docker push registry.company.com/pyframework:latest
 5. **Configure log aggregation** with ELK stack
 
 For additional deployment options and advanced configurations, refer to the [Deployment Guide](DEPLOYMENT.md).
+
+> Last updated: 2025-08-29
+> Recent internal changes: DB connections (thread-local + auto-reconnect), audit logging stability, OAuth async mocking compatibility, session rotation/cleanup, simple test RateLimiter, and pytest asyncio config.

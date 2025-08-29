@@ -392,3 +392,6 @@ The optimized database is backward compatible with the existing database schema 
 5. **Implement Monitoring:** Set up performance alerting
 
 For additional performance tuning and advanced optimization strategies, refer to the [Advanced Performance Guide](advanced-performance.md).
+
+> Last updated: 2025-08-29
+> Recent internal changes: DB connections (thread-local + auto-reconnect), audit logging stability, OAuth async mocking compatibility, session rotation/cleanup, simple test RateLimiter, and pytest asyncio config.

@@ -571,3 +571,6 @@ Consider adding caching for:
 ---
 
 **This deployment guide covers production deployment. Adjust configurations based on your specific infrastructure and requirements.**
+
+> Last updated: 2025-08-29
+> Recent internal changes: DB connections (thread-local + auto-reconnect), audit logging stability, OAuth async mocking compatibility, session rotation/cleanup, simple test RateLimiter, and pytest asyncio config.

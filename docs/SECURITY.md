@@ -184,3 +184,6 @@ SESSION_EXPIRE_HOURS=24
 ---
 
 **This security documentation reflects the current implementation. Review regularly and update as the framework evolves.**
+
+> Last updated: 2025-08-29
+> Recent internal changes: DB connections (thread-local + auto-reconnect), audit logging stability, OAuth async mocking compatibility, session rotation/cleanup, simple test RateLimiter, and pytest asyncio config.

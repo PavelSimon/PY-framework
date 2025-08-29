@@ -39,3 +39,6 @@
 - Avoid committing secrets; prefer environment variables in local/dev and CI.
 - Security-critical areas live in `security.py`, `csrf.py`, `auth/`, and `middleware.py`; add tests for all changes touching these modules.
 
+> Last updated: 2025-08-29
+> Recent internal changes: DB connections (thread-local + auto-reconnect), audit logging stability, OAuth async mocking compatibility, session rotation/cleanup, simple test RateLimiter, and pytest asyncio config.
+

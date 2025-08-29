@@ -1184,3 +1184,6 @@ Role ID 1 (Regular User):
 ---
 
 **API documentation is updated as new endpoints are added. Check the changelog for API changes.**
+
+> Last updated: 2025-08-29
+> Recent internal changes: DB connections (thread-local + auto-reconnect), audit logging stability, OAuth async mocking compatibility, session rotation/cleanup, simple test RateLimiter, and pytest asyncio config.

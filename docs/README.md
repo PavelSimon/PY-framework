@@ -189,3 +189,6 @@ Comprehensive development completion report covering:
 ---
 
 **This documentation is maintained to reflect the current state of PY-Framework. Last updated with framework version incorporating OAuth integration, two-factor authentication, advanced audit logging, performance monitoring, enhanced monitoring system with Prometheus metrics and intelligent alerting, and enterprise-grade security features.**
+
+> Last updated: 2025-08-29
+> Recent internal changes: DB connections (thread-local + auto-reconnect), audit logging stability, OAuth async mocking compatibility, session rotation/cleanup, simple test RateLimiter, and pytest asyncio config.

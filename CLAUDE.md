@@ -767,3 +767,6 @@ The framework implements a professional 3-tier navigation structure:
 ---
 
 **Ready for continued development. Signal when ready to proceed with detailed implementation.**
+
+> Last updated: 2025-08-29
+> Recent internal changes: DB connections (thread-local + auto-reconnect), audit logging stability, OAuth async mocking compatibility, session rotation/cleanup, simple test RateLimiter, and pytest asyncio config.
