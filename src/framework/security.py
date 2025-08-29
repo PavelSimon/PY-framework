@@ -6,51 +6,13 @@ Provides comprehensive security features, rate limiting, and protection mechanis
 import time
 import hashlib
 from typing import Dict, Any, Tuple, Optional
-from collections import defaultdict, deque
 from datetime import datetime, timedelta
+from collections import deque
 from fasthtml.common import *
+from .utils.rate_limit import RequestRateLimiter
 
 
-class RateLimiter:
-    """Rate limiting implementation for preventing abuse"""
-    
-    def __init__(self, max_requests: int = 100, window_seconds: int = 3600):
-        self.max_requests = max_requests
-        self.window_seconds = window_seconds
-        self.requests = defaultdict(deque)  # IP -> deque of timestamps
-    
-    def is_allowed(self, client_ip: str) -> Tuple[bool, Dict[str, Any]]:
-        """Check if request is allowed and return rate limit info"""
-        now = time.time()
-        window_start = now - self.window_seconds
-        
-        # Clean old requests outside window
-        ip_requests = self.requests[client_ip]
-        while ip_requests and ip_requests[0] < window_start:
-            ip_requests.popleft()
-        
-        # Check if under limit
-        if len(ip_requests) >= self.max_requests:
-            # Calculate when the oldest request will expire
-            reset_time = ip_requests[0] + self.window_seconds
-            remaining_time = max(0, int(reset_time - now))
-            
-            return False, {
-                'limit': self.max_requests,
-                'remaining': 0,
-                'reset': int(reset_time),
-                'retry_after': remaining_time
-            }
-        
-        # Add current request
-        ip_requests.append(now)
-        
-        return True, {
-            'limit': self.max_requests,
-            'remaining': self.max_requests - len(ip_requests),
-            'reset': int(now + self.window_seconds),
-            'retry_after': 0
-        }
+ 
 
 
 class SecurityConfig:
@@ -78,7 +40,7 @@ class SecurityMiddleware:
     
     def __init__(self, config: SecurityConfig = None):
         self.config = config or SecurityConfig()
-        self.rate_limiter = RateLimiter(
+        self.rate_limiter = RequestRateLimiter(
             max_requests=self.config.rate_limit_requests,
             window_seconds=self.config.rate_limit_window
         ) if self.config.enable_rate_limiting else None
@@ -139,11 +101,16 @@ class SecurityMiddleware:
         
         # Content Security Policy
         if self.config.enable_strict_csp:
-            # Strict CSP for production
+            # Generate per-request nonce for inline scripts/styles
+            import secrets
+            nonce = secrets.token_urlsafe(16)
+            # Expose nonce for templates/AJAX if needed
+            headers["X-CSP-Nonce"] = nonce
+            # Strict CSP for production with nonces
             csp_policy = (
                 "default-src 'self'; "
-                "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
-                "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+                f"script-src 'self' 'nonce-{nonce}' https://cdn.jsdelivr.net; "
+                f"style-src 'self' 'nonce-{nonce}' https://fonts.googleapis.com; "
                 "font-src 'self' https://fonts.gstatic.com; "
                 "img-src 'self' data: https:; "
                 "connect-src 'self'; "
@@ -286,3 +253,6 @@ security_reporter = SecurityReporter()
 def report_security_event(event_type: str, client_ip: str, details: Dict[str, Any]):
     """Report a security event"""
     security_reporter.log_security_event(event_type, client_ip, details)
+
+# Backwards compatibility for tests importing RateLimiter from this module
+RateLimiter = RequestRateLimiter

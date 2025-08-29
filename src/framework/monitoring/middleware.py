@@ -6,6 +6,7 @@ Integrates metrics collection and health monitoring into FastHTML applications
 import time
 import threading
 from typing import Callable, Any, Dict
+import asyncio
 from fasthtml.common import Request, Response
 from .metrics_collector import get_metrics_collector
 from .health_checker import get_health_checker
@@ -36,7 +37,11 @@ class MonitoringMiddleware:
         
         try:
             # Process the request
-            response = self.app(request)
+            # Support async apps as well
+            if asyncio.iscoroutinefunction(self.app):
+                response = asyncio.get_event_loop().run_until_complete(self.app(request))
+            else:
+                response = self.app(request)
             
             # Calculate duration
             duration = time.time() - start_time
@@ -93,6 +98,52 @@ def add_monitoring_middleware(app: Any) -> Any:
     
     # Wrap the app with monitoring middleware
     return MonitoringMiddleware(app)
+
+
+class AsyncMonitoringMiddleware:
+    """Async-aware monitoring middleware compatible with FastHTML/Starlette style."""
+
+    def __init__(self, app: Any):
+        self.app = app
+        self.metrics = get_metrics_collector()
+        self.health = get_health_checker()
+        self.alerts = get_alert_manager()
+        self._active_requests = 0
+        self._request_lock = threading.Lock()
+
+    async def __call__(self, request, call_next):
+        start_time = time.time()
+        with self._request_lock:
+            self._active_requests += 1
+            self.metrics.set_gauge('http_requests_active', self._active_requests)
+
+        try:
+            response = await call_next(request)
+            duration = time.time() - start_time
+            method = getattr(request, 'method', 'GET')
+            path = getattr(getattr(request, 'url', None), 'path', '/') if hasattr(request, 'url') else '/'
+            status_code = getattr(response, 'status_code', 200)
+            self.metrics.track_request(method, path, status_code, duration)
+            return response
+        except Exception:
+            duration = time.time() - start_time
+            method = getattr(request, 'method', 'GET')
+            path = getattr(getattr(request, 'url', None), 'path', '/') if hasattr(request, 'url') else '/'
+            self.metrics.track_request(method, path, 500, duration)
+            raise
+        finally:
+            with self._request_lock:
+                self._active_requests -= 1
+                self.metrics.set_gauge('http_requests_active', self._active_requests)
+
+
+def add_async_monitoring_middleware(app: Any) -> None:
+    """Attach async monitoring middleware via app.middleware('http')."""
+    middleware = AsyncMonitoringMiddleware(app)
+
+    @app.middleware("http")
+    async def _monitoring(request, call_next):
+        return await middleware(request, call_next)
 
 
 def monitor_database_operation(operation_name: str):

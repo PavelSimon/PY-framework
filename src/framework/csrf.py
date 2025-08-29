@@ -9,13 +9,15 @@ import hmac
 from typing import Optional, Dict, Any
 from fasthtml.common import *
 from datetime import datetime, timedelta
+from .csrf_storage import InMemoryCSRFStorage, CSRFTokenRecord
 
 
 class CSRFProtection:
-    def __init__(self, secret_key: str, token_lifetime_minutes: int = 60):
+    def __init__(self, secret_key: str, token_lifetime_minutes: int = 60, storage: Optional[InMemoryCSRFStorage] = None):
         self.secret_key = secret_key.encode() if isinstance(secret_key, str) else secret_key
         self.token_lifetime = timedelta(minutes=token_lifetime_minutes)
-        self._active_tokens = {}  # In production, use Redis or database
+        # Pluggable storage (default: in-memory). For multi-process, use DuckDBCSRFStorage.
+        self._storage = storage or InMemoryCSRFStorage()
     
     def generate_token(self, session_id: str = None) -> str:
         """Generate a new CSRF token"""
@@ -39,12 +41,15 @@ class CSRFProtection:
         # Combine token data and signature
         full_token = f"{token_data}|{signature}"
         
-        # Store token temporarily (in production, use proper storage)
-        self._active_tokens[random_token] = {
-            'created_at': datetime.now(),
-            'session_id': session_id,
-            'used': False
-        }
+        # Persist token
+        self._storage.save(
+            CSRFTokenRecord(
+                random_token=random_token,
+                created_at=datetime.now(),
+                session_id=session_id,
+                used=False,
+            )
+        )
         
         return full_token
     
@@ -82,23 +87,23 @@ class CSRFProtection:
                 return False
             
             # Check if token exists and is not used
-            if random_token not in self._active_tokens:
+            token_rec = self._storage.get(random_token)
+            if not token_rec:
                 return False
             
-            token_info = self._active_tokens[random_token]
-            if token_info['used'] and consume:
+            if token_rec.used and consume:
                 return False
             
             # Check token expiration
-            token_age = datetime.now() - token_info['created_at']
+            token_age = datetime.now() - token_rec.created_at
             if token_age > self.token_lifetime:
                 # Remove expired token
-                del self._active_tokens[random_token]
+                self._storage.delete(random_token)
                 return False
             
             # Mark token as used if consuming
             if consume:
-                token_info['used'] = True
+                self._storage.mark_used(random_token)
             
             return True
             
@@ -109,14 +114,7 @@ class CSRFProtection:
     def cleanup_expired_tokens(self):
         """Remove expired tokens from storage"""
         current_time = datetime.now()
-        expired_tokens = []
-        
-        for token, info in self._active_tokens.items():
-            if current_time - info['created_at'] > self.token_lifetime:
-                expired_tokens.append(token)
-        
-        for token in expired_tokens:
-            del self._active_tokens[token]
+        self._storage.cleanup_expired(current_time - self.token_lifetime)
     
     def create_csrf_input(self, session_id: str = None) -> Input:
         """Create a hidden input field with CSRF token"""

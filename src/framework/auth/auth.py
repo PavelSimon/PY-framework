@@ -229,24 +229,4 @@ class AuthenticationService:
         return max(0, score), feedback
 
 
-class RateLimiter:
-    def __init__(self):
-        self.attempts = {}
-        self.max_attempts = 5
-        self.window_minutes = 15
-
-    def is_rate_limited(self, identifier: str) -> bool:
-        now = datetime.now()
-        if identifier not in self.attempts:
-            self.attempts[identifier] = []
-        
-        self.attempts[identifier] = [
-            attempt for attempt in self.attempts[identifier]
-            if now - attempt < timedelta(minutes=self.window_minutes)
-        ]
-        
-        if len(self.attempts[identifier]) >= self.max_attempts:
-            return True
-        
-        self.attempts[identifier].append(now)
-        return False
+from ..utils.rate_limit import LoginRateLimiter as RateLimiter
