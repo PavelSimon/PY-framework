@@ -104,18 +104,66 @@ class AuthenticationService:
             return None
 
     def authenticate_user(self, db, email: str, password: str, ip_address: str = None) -> Tuple[bool, Optional[Dict[str, Any]], str]:
+        from ..audit import get_audit_service, AuditEventType
         user = db.get_user_by_email(email)
         if not user:
+            try:
+                audit = get_audit_service(db)
+                audit.log_authentication_event(
+                    event_type=AuditEventType.USER_LOGIN_FAILED,
+                    email=email,
+                    ip_address=ip_address,
+                    success=False,
+                    details={"failure_reason": "invalid_credentials"},
+                )
+            except Exception:
+                pass
             return False, None, "Invalid email or password"
         
         if not user["is_active"]:
+            try:
+                audit = get_audit_service(db)
+                audit.log_authentication_event(
+                    event_type=AuditEventType.USER_LOGIN_FAILED,
+                    user_id=user["id"],
+                    email=email,
+                    ip_address=ip_address,
+                    success=False,
+                    details={"failure_reason": "account_deactivated"},
+                )
+            except Exception:
+                pass
             return False, None, "Account is deactivated"
         
         if user["locked_until"] and user["locked_until"] > datetime.now():
+            try:
+                audit = get_audit_service(db)
+                audit.log_authentication_event(
+                    event_type=AuditEventType.USER_LOGIN_FAILED,
+                    user_id=user["id"],
+                    email=email,
+                    ip_address=ip_address,
+                    success=False,
+                    details={"failure_reason": "account_locked"},
+                )
+            except Exception:
+                pass
             return False, None, f"Account is locked due to too many failed attempts. Try again later."
         
         if not self.verify_password(password, user["password_hash"]):
             failed_attempts = db.increment_failed_login(user["id"], self.lockout_duration_minutes)
+            try:
+                audit = get_audit_service(db)
+                audit.log_authentication_event(
+                    event_type=AuditEventType.USER_LOGIN_FAILED,
+                    user_id=user["id"],
+                    email=email,
+                    ip_address=ip_address,
+                    success=False,
+                    details={"failure_reason": "invalid_credentials", "failed_attempts": failed_attempts},
+                )
+            except Exception:
+                pass
             if failed_attempts >= self.max_failed_attempts:
                 return False, None, f"Account locked due to {self.max_failed_attempts} failed attempts. Try again in {self.lockout_duration_minutes} minutes."
             return False, None, "Invalid email or password"

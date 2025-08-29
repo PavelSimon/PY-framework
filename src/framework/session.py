@@ -6,6 +6,7 @@ Handles user authentication and session state
 from typing import Optional, Dict, Any
 from fasthtml.common import *
 from datetime import timedelta
+from starlette.responses import Response, RedirectResponse
 
 # Simple in-memory session store for development
 # In production, this would be replaced with proper cookie handling
@@ -50,16 +51,28 @@ def get_current_user(request, db, auth_service) -> Optional[Dict[str, Any]]:
 
 
 def create_session_response(content, session_id: str = None, clear_session: bool = False):
-    """Create response with session cookie"""
+    """Create response with session cookie actions.
+
+    - If clear_session is True: clear server-side session state and attach an
+      expired session cookie to the response.
+    - Otherwise: return content unchanged (back-compat).
+    """
     if clear_session:
-        # Clear session from temporary store
         if session_id:
             clear_session(session_id)
-        # For development, we'll clear all sessions to ensure logout works
         _active_sessions.clear()
-    
-    # For now, return content directly and rely on the in-memory session store
-    # This is a simplified approach for development
+
+        # Attach a cleared cookie to either an existing response or wrap content.
+        cookie_header = clear_session_cookie()
+        if hasattr(content, "headers") and isinstance(getattr(content, "headers", None), dict):
+            content.headers["Set-Cookie"] = cookie_header
+            return content
+
+        # Wrap HTML-ish content in a Response so we can set headers safely
+        resp = Response(str(content), media_type="text/html")
+        resp.headers["Set-Cookie"] = cookie_header
+        return resp
+
     return content
 
 
@@ -99,6 +112,29 @@ def apply_session_cookie(response: Any, cookie_header: str) -> Any:
         # Here we overwrite or set a single session cookie header.
         response.headers["Set-Cookie"] = cookie_header
     return response
+
+
+def clear_session_cookie(
+    *,
+    path: str = "/",
+    secure: bool = True,
+    httponly: bool = True,
+    samesite: str = "Lax",
+) -> str:
+    """Build a Set-Cookie header that clears the session cookie.
+
+    Uses Max-Age=0 to instruct the browser to delete the cookie.
+    """
+    attrs = ["session_id="]
+    attrs.append(f"Path={path}")
+    attrs.append("Max-Age=0")
+    if secure:
+        attrs.append("Secure")
+    if httponly:
+        attrs.append("HttpOnly")
+    if samesite:
+        attrs.append(f"SameSite={samesite.capitalize()}")
+    return "; ".join(attrs)
 
 
 def require_auth(func):

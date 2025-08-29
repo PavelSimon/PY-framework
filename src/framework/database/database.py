@@ -102,7 +102,7 @@ class Database:
                 refresh_token VARCHAR,
                 expires_at TIMESTAMP,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+                FOREIGN KEY (user_id) REFERENCES users(id),
                 UNIQUE(provider, provider_user_id)
             )
         """)
@@ -116,7 +116,7 @@ class Database:
                 ip_address VARCHAR,
                 user_agent VARCHAR,
                 is_active BOOLEAN DEFAULT TRUE,
-                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+                FOREIGN KEY (user_id) REFERENCES users(id)
             )
         """)
         
@@ -128,7 +128,7 @@ class Database:
                 expires_at TIMESTAMP NOT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 used_at TIMESTAMP,
-                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+                FOREIGN KEY (user_id) REFERENCES users(id)
             )
         """)
         
@@ -140,7 +140,7 @@ class Database:
                 expires_at TIMESTAMP NOT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 used_at TIMESTAMP,
-                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+                FOREIGN KEY (user_id) REFERENCES users(id)
             )
         """)
         
@@ -198,7 +198,7 @@ class Database:
                 secret VARCHAR NOT NULL,
                 enabled BOOLEAN DEFAULT TRUE,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+                FOREIGN KEY (user_id) REFERENCES users(id),
                 UNIQUE(user_id)
             )
         """)
@@ -210,7 +210,7 @@ class Database:
                 code_hash VARCHAR NOT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 used_at TIMESTAMP,
-                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+                FOREIGN KEY (user_id) REFERENCES users(id)
             )
         """)
         
@@ -221,7 +221,7 @@ class Database:
                 token VARCHAR UNIQUE NOT NULL,
                 expires_at TIMESTAMP NOT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+                FOREIGN KEY (user_id) REFERENCES users(id)
             )
         """)
         
@@ -363,6 +363,19 @@ class Database:
             """, [new_attempts, user_id])
         
         return new_attempts
+
+    def unlock_user_account(self, user_id: int) -> None:
+        """Manually unlock a user's account by resetting lock state."""
+        self.conn.execute(
+            """
+            UPDATE users
+            SET failed_login_attempts = 0,
+                locked_until = NULL,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+            """,
+            [user_id],
+        )
 
     def verify_user_email(self, user_id: int):
         self.conn.execute("""

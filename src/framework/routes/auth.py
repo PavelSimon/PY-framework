@@ -7,7 +7,13 @@ from starlette.responses import RedirectResponse
 from ..auth import UserRegistration
 from ..email import EmailService
 from ..layout import create_auth_layout, create_page_title, create_success_message, create_error_message, create_warning_message
-from ..session import create_session_response, store_session, clear_session
+from ..session import (
+    create_session_response,
+    store_session,
+    clear_session,
+    build_session_cookie,
+    apply_session_cookie,
+)
 from ..csrf import csrf_protect
 from ..audit import get_audit_service, AuditEventType
 
@@ -382,8 +388,10 @@ def create_auth_routes(app, db, auth_service, email_service=None, csrf_protectio
             # Store session temporarily for development
             store_session(session_id, user['id'])
             
-            # Redirect directly to dashboard after successful login
-            return RedirectResponse("/dashboard", status_code=302)
+            # Redirect directly to dashboard after successful login and set cookie
+            resp = RedirectResponse("/dashboard", status_code=302)
+            cookie = build_session_cookie(session_id)
+            return apply_session_cookie(resp, cookie)
             
         except Exception as e:
             return Div(
@@ -1222,7 +1230,9 @@ def create_auth_routes(app, db, auth_service, email_service=None, csrf_protectio
                     # Update login timestamp
                     db.update_user_login(email_user["id"], reset_failed_attempts=True)
                     
-                    return RedirectResponse("/dashboard", status_code=302)
+                    resp = RedirectResponse("/dashboard", status_code=302)
+                    cookie = build_session_cookie(session_id)
+                    return apply_session_cookie(resp, cookie)
                 
                 else:
                     # Create new user from OAuth information
@@ -1281,7 +1291,9 @@ def create_auth_routes(app, db, auth_service, email_service=None, csrf_protectio
                     # Update login timestamp
                     db.update_user_login(user_id, reset_failed_attempts=True)
                     
-                    return RedirectResponse("/dashboard", status_code=302)
+                    resp = RedirectResponse("/dashboard", status_code=302)
+                    cookie = build_session_cookie(session_id)
+                    return apply_session_cookie(resp, cookie)
         
         except Exception as e:
             print(f"OAuth callback processing error: {e}")
@@ -1494,8 +1506,10 @@ def create_auth_routes(app, db, auth_service, email_service=None, csrf_protectio
             # Update login timestamp
             db.update_user_login(user['id'], reset_failed_attempts=True)
             
-            # Redirect to dashboard
-            return RedirectResponse("/dashboard", status_code=302)
+            # Redirect to dashboard and set cookie
+            resp = RedirectResponse("/dashboard", status_code=302)
+            cookie = build_session_cookie(session_id)
+            return apply_session_cookie(resp, cookie)
             
         except Exception as e:
             print(f"2FA verification error: {e}")
